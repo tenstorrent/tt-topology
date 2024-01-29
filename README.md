@@ -1,92 +1,153 @@
-# tt-topology
+# TT-Topology
 
+Tenstorrent Topology (TT-Topology) is a command line utility
+used to flash multiple NB cards on a system to use specific eth routing configurations.
 
+It curretly supports three configurtions - mesh, linear and torus
 
-## Getting started
+## Official Repository
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+[https://github.com/tenstorrent/tt-topology/](https://github.com/tenstorrent/tt-topology/)
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+# Getting started
+Build and editing instruction are as follows -
 
-## Add your files
+## Building from Git
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+Install and source rust for the luwen library
+```
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+```
+
+## Optional
+Generate and source a python environment.  This is useful not only to isolate
+your environment, but potentially easier to debug and use.  This environment
+can be shared if you want to use a single environment for all your Tenstorrent
+tools
 
 ```
-cd existing_repo
-git remote add origin https://yyz-gitlab.local.tenstorrent.com/syseng-platform/tt-topology.git
-git branch -M main
-git push -uf origin main
+python3 -m venv .venv
+source .venv/bin/activate
+pip3 install --upgrade pip
+```
+## Required
+
+Install tt-topology.
+```
+pip3 install .
 ```
 
-## Integrate with your tools
+## Optional - for TT-Topology developers
 
-- [ ] [Set up project integrations](https://yyz-gitlab.local.tenstorrent.com/syseng-platform/tt-topology/-/settings/integrations)
+Generate and source a python3 environment
+```
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install pre-commit
+```
 
-## Collaborate with your team
+For users who would like to edit the code without re-building, install SMI in editable mode.
+```
+pip install --editable .
+```
+Recommended: install the pre-commit hooks so there is auto formatting for all files on committing.
+```
+pre-commit install
+```
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+# Usage
 
-## Test and Deploy
+Command line arguments
+```
+usage: tt-topology [-h] [-v] [-l {linear,torus,mesh}] [-ls] [--log [log]] [-p [plot]]
 
-Use the built-in continuous integration in GitLab.
+Tenstorrent Topology (TT-Topology) is a command line utility to flash ethernet coordinates when multiple NB's are connected together.
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing(SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+optional arguments:
+  -h, --help            show this help message and exit
+  -v, --version         show program's version number and exit
+  -l {linear,torus,mesh}, --layout {linear,torus,mesh}
+                        Select the layout (linear, torus, mesh). Default is linear.
+  -ls, --list           List out all the boards on host with their coordinates and layout.
+  --log [log]           Change filename for the topology flash log. Default:
+                        ~/tt_topology_logs/<timestamp>_log.json
+  -p [plot], --plot_filename [plot]
+                        Change the plot of the png that will have the graph layout of the chips. Default:
+                        chip_layout.png
+```
+# TT-Topology Procedure
 
-***
+TT-Topology does the following when calculating and flashing the coordinates -
+1. Flash all the boards to default - set all eth port disables to 0 and reset coordinates to (0,0) for local chips and (1,0) for n300 remote chips.
+2. Issue a board level reset to apply the new flash to the chips.
+3. Generate a mapping of all possible connections and their type between the available chips.
+4. Using a graph algorithm generate coordinates for each chip based on user input. These layouts are discussed in detail in the sections below.
+5. Write the new coordinates to the chips.
+6. Issue a board level reset to apply the new flash to the chips.
+7. Return a png with a graphic representation of the layout and a .json log file with details of the above steps.
 
-# Editing this README
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thank you to [makeareadme.com](https://www.makeareadme.com/) for this template.
+# Chip layouts
 
-## Suggestions for a good README
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+TT-topology can be used to flash one of the three chip layouts - mesh, linear and torus.
 
-## Name
-Choose a self-explaining name for your project.
+## Mesh
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+In the mesh layout is a trivalent graph where each node can have a max of 3 connection. A BFS algorithm is used to assign the coordinates.
+Command to generate a mesh layout
+```
+$ tt-topology -l mesh -p mesh_layout.png
+```
+For a host with 2 n300 cards and 4 n300 cards, the command will generate a layouts that look as follows -
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+<p align="center">
+  <img src="images/mesh_layout_2x4.png?raw=true" alt="mesh_layout_2x4" width="47%"/>
+  &nbsp; &nbsp;
+  <img src="images/mesh_layout.png?raw=true" alt="mesh_layout_2x8" width="47%"/>
+</p>
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+## Linear
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+The linear layout, as the name suggests is a layout where all chips are connected by a single line. The coordinates are assigned by finding a cycle in the graph and then assigning coordinates in order.
+Command to generate a linear layout
+```
+$ tt-topology -l linear -f linear_layout.png
+```
+For a host with 2 n300 cards and 4 n300 cards, the command will generate a layouts that look as follows -
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+<p align="center">
+  <img src="images/linear_layout_2x4.png?raw=true" alt="linear_layout_2x4" width="47%"/>
+  &nbsp; &nbsp;
+  <img src="images/linear_layout.png?raw=true" alt="linear_layout_2x8" width="47%"/>
+</p>
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+## Torus
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+The torus layout is a cyclic graph where all chips have a single line connecting all nodes.
+The coordinates are assigned by finding a cycle in the graph and then assigning coordinates in order.
+Command to generate a torus layout
+```
+$ tt-topology -l torus -p torus_layout.png
+```
+For a host with four n300 cards, the command will generate a layout that looks as follows
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+<p align="center">
+  <img src="images/torus_layout_2x4.png?raw=true" alt="torus_layout_2x4" width="47%"/>
+  &nbsp; &nbsp;
+  <img src="images/torus_layout.png?raw=true" alt="torus_layout_2x8" width="47%"/>
+</p>
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+# Logging
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+TT-Topology records the pre and post flash relevant SPI registers, connection map and coordinates of the chips in a .json file for record keeping and debugging.
+By default it is stored at ```~/tt_topology_logs/<timestamp>_log.json```. This can be changed by using the log command line argument as follows
+```
+$ tt-topology -log new_log.json ...
+```
 
-## License
-For open source projects, say how it is licensed.
+# License
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Apache 2.0 - https://www.apache.org/licenses/LICENSE-2.0.txt

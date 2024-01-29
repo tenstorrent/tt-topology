@@ -1,0 +1,3 @@
+MSG_TRIGGER_SPI_COPY_LtoR:                0x50
+MSG_TYPE_ARC_STATE3:                      0xA3
+MSG_TYPE_TRIGGER_RESET:                   0x56

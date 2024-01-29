@@ -1,0 +1,8 @@
+.eggs/
+*.egg-info
+my-env/
+.env/
+.ignored/
+__pycache__/
+.vscode/
+build/
