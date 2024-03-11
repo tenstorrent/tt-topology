@@ -11,7 +11,7 @@ import time
 import argparse
 import pkg_resources
 from pyluwen import detect_chips
-from tt_tools_common.wh_reset import WHChipReset
+from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_topology.backend import TopoBackend, detect_current_topology
 from tt_tools_common.utils_common.system_utils import (
