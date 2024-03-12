@@ -6,8 +6,7 @@ import datetime
 from pathlib import Path
 import networkx as nx
 from typing import List
-from pyluwen import PciChip
-from tt_topology import log
+from pyluwen import PciChip, detect_chips_fallible
 from collections import deque
 import matplotlib.pyplot as plt
 import tt_topology.constants as constants
@@ -18,6 +17,10 @@ from tt_tools_common.utils_common.tools_utils import (
     init_logging,
 )
 from tt_tools_common.utils_common.system_utils import get_host_info
+from tt_tools_common.reset_common.galaxy_reset import GalaxyReset
+from tt_tools_common.reset_common.wh_reset import WHChipReset
+from tt_tools_common.reset_common import host_reset_log
+from tt_topology import log
 
 LOG_FOLDER = os.path.expanduser("~/tt_topology_logs/")
 
@@ -733,3 +736,99 @@ class TopoBackend:
             f"Saved board layout to {self.plot_filename}",
             CMD_LINE_COLOR.ENDC,
         )
+
+
+class TopoBackend_Octopus:
+    def __init__(
+        self,
+        devices: List[PciChip],
+        mobo_dict_list: List[dict],
+    ):
+        self.devices_local = devices
+        self.devices_remote = [
+            entry["mobo"] for entry in mobo_dict_list["wh_mobo_reset"]
+        ]
+        self.mobo_dict_list = mobo_dict_list
+
+    def eth_mobo_enable(self):
+        """
+        Set eth-mobo-enable on every n150
+        """
+        for device in self.devices_local:
+            device = device.as_wh()
+            device.spi_write(
+                int(constants.MOBO_ETH_EN),
+                int(0xC3).to_bytes(constants.MOBO_ETH_EN_SIZE, byteorder="little"),
+            )
+
+    def set_rack_shelf_remote(self, mobo_dict):
+        mobo_list = [entry["mobo"] for entry in mobo_dict]
+        galaxy_reset_obj = GalaxyReset()
+        for i, mobo in enumerate(mobo_list):
+            cmd = "rackshelf"
+            data = {"rack": 0, "shelf": i + 1}
+            galaxy_reset_obj.server_communication(
+                post=True, mobo=mobo, command=cmd, data=data
+            )
+
+    def set_rack_shelf_local(self, device, shelf: int = 0):
+        coord_addr = constants.ETH_PARAM_RACK_SHELF
+        coor = (shelf << 16) | 0
+        device.spi_write(int(coord_addr), int(coor).to_bytes(4, byteorder="little"))
+
+    def set_x_y_local(self, init: bool = True):
+        coord_addr = constants.ETH_PARAM_CHIP_COORD
+
+        if init:
+            for device in self.devices_local:
+                device = device.as_wh()
+                device.spi_write(int(coord_addr), bytearray([0x0, 0x0, 0x0, 0x0]))
+        else:
+            coord_map = {}
+            for i, device in enumerate(self.devices_local):
+                device = device.as_wh()
+                readback_remote = bytearray(4)
+                device.spi_read(
+                    int(constants.ETH_TEST_RESULT_REMOTE_COORD), readback_remote
+                )
+                x = int.from_bytes(readback_remote[2:3], byteorder="little")
+                y = int.from_bytes(readback_remote[3:4], byteorder="little")
+                coord_map[i] = (x, y)
+
+            sorted_coord_map = sorted(coord_map.items(), key=lambda x: x[1])
+            for i, (idx, _) in enumerate(sorted_coord_map):
+                device = self.devices_local[idx].as_wh()
+                device.spi_write(
+                    int(coord_addr), int(i).to_bytes(4, byteorder="little")
+                )
+
+    def galaxy_reset(self, mobo_dict):
+        """
+        Reset all galaxies
+        """
+        mobo_reset_obj = GalaxyReset()
+        mobo_reset_obj.warm_reset_mobo(mobo_dict)
+
+        chips = detect_chips_fallible(local_only=True, noc_safe=False)
+        for device in chips:
+            device.init()
+
+    def read_remote_set_local(self):
+        for device in self.devices_local:
+            device = device.as_wh()
+            neighbours = device.get_neighbouring_chips()
+            if len(neighbours) > 0:
+                shelf = neighbours[0].eth_addr.rack_y
+            else:
+                print("no neighbours found")
+                continue
+
+            if shelf == 2:
+                nb_shelf = 3
+            elif shelf == 1:
+                nb_shelf = 0
+            else:
+                print("Invalid shelf")
+                sys.exit(1)
+
+            self.set_rack_shelf_local(device=device, shelf=nb_shelf)
