@@ -10,7 +10,6 @@ import sys
 import time
 import argparse
 import pkg_resources
-import json
 from pyluwen import detect_chips
 from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
