@@ -263,7 +263,8 @@ def program_galaxy(topo_backend_octo: TopoBackend_Octopus):
     3. program all n150s to R0, S0, X0, Y0
     4. Reset with retimer_sel and disable_sel and wait for training
     5. check QSFP link and change shelf number for each n150
-    6. reset with retimer_sel and disable_sel and wait for training, and verify all chips show up
+    6. program the x/y coords of the local n150s
+    7. reset with retimer_sel and disable_sel and wait for training, and verify all chips show up
     """
     disabled_ports_before = [
         "0:0",
@@ -322,6 +323,9 @@ def program_galaxy(topo_backend_octo: TopoBackend_Octopus):
 
     print("check QSFP link and change shelf number for each n150")
     topo_backend_octo.read_remote_set_local()
+
+    print("program the x/y coords of the local n150s")
+    topo_backend_octo.set_x_y_local(init=False)
 
     print(
         "reset with retimer_sel and disable_sel and wait for training, and verify all chips show up"

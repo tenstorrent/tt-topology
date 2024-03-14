@@ -799,7 +799,7 @@ class TopoBackend_Octopus:
             for i, (idx, _) in enumerate(sorted_coord_map):
                 device = self.devices_local[idx].as_wh()
                 device.spi_write(
-                    int(coord_addr), int(i).to_bytes(4, byteorder="little")
+                    int(coord_addr), int(i << 8 | 0x0).to_bytes(4, byteorder="little")
                 )
 
     def galaxy_reset(self, mobo_dict):
