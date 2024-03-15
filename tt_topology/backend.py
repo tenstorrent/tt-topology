@@ -771,36 +771,35 @@ class TopoBackend_Octopus:
                 post=True, mobo=mobo, command=cmd, data=data
             )
 
-    def set_rack_shelf_local(self, device, shelf: int = 0):
-        coord_addr = constants.ETH_PARAM_RACK_SHELF
-        coor = (shelf << 16) | 0
-        device.spi_write(int(coord_addr), int(coor).to_bytes(4, byteorder="little"))
+    def set_initial_chip_coords(self):
+        xy_addr = constants.ETH_PARAM_CHIP_COORD
+        rack_shelf_addr = constants.ETH_PARAM_RACK_SHELF
 
-    def set_x_y_local(self, init: bool = True):
+        for i, device in enumerate(self.devices_local):
+            device = device.as_wh()
+            device.spi_write(int(xy_addr), bytearray([0x0, 0x0, 0x0, 0x0]))
+            device.spi_write(int(rack_shelf_addr), bytearray([0x0, 0x0, 0x0, 0x0]))
+
+    def set_x_y_local(self):
         coord_addr = constants.ETH_PARAM_CHIP_COORD
 
-        if init:
-            for device in self.devices_local:
-                device = device.as_wh()
-                device.spi_write(int(coord_addr), bytearray([0x0, 0x0, 0x0, 0x0]))
-        else:
-            coord_map = {}
-            for i, device in enumerate(self.devices_local):
-                device = device.as_wh()
-                readback_remote = bytearray(4)
-                device.spi_read(
-                    int(constants.ETH_TEST_RESULT_REMOTE_COORD), readback_remote
-                )
-                x = int.from_bytes(readback_remote[2:3], byteorder="little")
-                y = int.from_bytes(readback_remote[3:4], byteorder="little")
-                coord_map[i] = (x, y)
+        coord_map = {}
+        for i, device in enumerate(self.devices_local):
+            device = device.as_wh()
+            readback_remote = bytearray(4)
+            device.spi_read(
+                int(constants.ETH_TEST_RESULT_REMOTE_COORD), readback_remote
+            )
+            x = int.from_bytes(readback_remote[2:3], byteorder="little")
+            y = int.from_bytes(readback_remote[3:4], byteorder="little")
+            coord_map[i] = (x, y)
 
-            sorted_coord_map = sorted(coord_map.items(), key=lambda x: x[1])
-            for i, (idx, _) in enumerate(sorted_coord_map):
-                device = self.devices_local[idx].as_wh()
-                device.spi_write(
-                    int(coord_addr), int(i << 8 | 0x0).to_bytes(4, byteorder="little")
-                )
+        sorted_coord_map = sorted(coord_map.items(), key=lambda x: x[1])
+        for i, (idx, _) in enumerate(sorted_coord_map):
+            device = self.devices_local[idx].as_wh()
+            device.spi_write(
+                int(coord_addr), int(i << 8 | 0x0).to_bytes(4, byteorder="little")
+            )
 
     def galaxy_reset(self, mobo_dict):
         """
@@ -814,6 +813,8 @@ class TopoBackend_Octopus:
             device.init()
 
     def read_remote_set_local(self):
+        shelf_rack_addr = constants.ETH_PARAM_RACK_SHELF
+
         for device in self.devices_local:
             device = device.as_wh()
             neighbours = device.get_neighbouring_chips()
@@ -831,4 +832,5 @@ class TopoBackend_Octopus:
                 print("Invalid shelf")
                 sys.exit(1)
 
-            self.set_rack_shelf_local(device=device, shelf=nb_shelf)
+            shelf_rack = (shelf << 16) | 0 # Set rack to 0
+            device.spi_write(int(shelf_rack_addr), int(shelf_rack).to_bytes(4, byteorder="little"))

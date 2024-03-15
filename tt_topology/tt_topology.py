@@ -315,7 +315,7 @@ def program_galaxy(topo_backend_octo: TopoBackend_Octopus):
     topo_backend_octo.set_rack_shelf_remote(mobo_dict_list)
 
     print("program all n150s to R0, S0, X0, Y0")
-    topo_backend_octo.set_x_y_local(init=True)
+    topo_backend_octo.set_initial_chip_coords()
 
     print("reset with retimer_sel and disable_sel and wait for training")
 
@@ -325,7 +325,7 @@ def program_galaxy(topo_backend_octo: TopoBackend_Octopus):
     topo_backend_octo.read_remote_set_local()
 
     print("program the x/y coords of the local n150s")
-    topo_backend_octo.set_x_y_local(init=False)
+    topo_backend_octo.set_x_y_local()
 
     print(
         "reset with retimer_sel and disable_sel and wait for training, and verify all chips show up"
