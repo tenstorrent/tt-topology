@@ -321,11 +321,8 @@ def program_galaxy(topo_backend_octo: TopoBackend_Octopus):
 
     topo_backend_octo.galaxy_reset(mobo_dict_before)
 
-    print("check QSFP link and change shelf number for each n150")
+    print("check QSFP link and change rack, shelf, x, y coordinated for each of the local n150s")
     topo_backend_octo.read_remote_set_local()
-
-    print("program the x/y coords of the local n150s")
-    topo_backend_octo.set_x_y_local()
 
     print(
         "reset with retimer_sel and disable_sel and wait for training, and verify all chips show up"

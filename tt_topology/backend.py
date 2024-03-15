@@ -772,6 +772,9 @@ class TopoBackend_Octopus:
             )
 
     def set_initial_chip_coords(self):
+        """
+        Setup the initial chip coordinated to be all R0, S0, X0, Y0
+        """
         xy_addr = constants.ETH_PARAM_CHIP_COORD
         rack_shelf_addr = constants.ETH_PARAM_RACK_SHELF
 
@@ -779,27 +782,6 @@ class TopoBackend_Octopus:
             device = device.as_wh()
             device.spi_write(int(xy_addr), bytearray([0x0, 0x0, 0x0, 0x0]))
             device.spi_write(int(rack_shelf_addr), bytearray([0x0, 0x0, 0x0, 0x0]))
-
-    def set_x_y_local(self):
-        coord_addr = constants.ETH_PARAM_CHIP_COORD
-
-        coord_map = {}
-        for i, device in enumerate(self.devices_local):
-            device = device.as_wh()
-            readback_remote = bytearray(4)
-            device.spi_read(
-                int(constants.ETH_TEST_RESULT_REMOTE_COORD), readback_remote
-            )
-            x = int.from_bytes(readback_remote[2:3], byteorder="little")
-            y = int.from_bytes(readback_remote[3:4], byteorder="little")
-            coord_map[i] = (x, y)
-
-        sorted_coord_map = sorted(coord_map.items(), key=lambda x: x[1])
-        for i, (idx, _) in enumerate(sorted_coord_map):
-            device = self.devices_local[idx].as_wh()
-            device.spi_write(
-                int(coord_addr), int(i << 8 | 0x0).to_bytes(4, byteorder="little")
-            )
 
     def galaxy_reset(self, mobo_dict):
         """
@@ -813,24 +795,52 @@ class TopoBackend_Octopus:
             device.init()
 
     def read_remote_set_local(self):
+        """
+        Based on the remote coordinates, set the local coordinates
+        The n150s connected to shelf 1 in a TGG should stay shelf 0
+        The n150s connected to shelf 2 in a TGG should become shelf 3
+
+        On each shelf for the n150s, the y coordinates should be set to 0,1,2,3 based on
+        where they connect to on the galaxy
+        """
+        xy_addr = constants.ETH_PARAM_CHIP_COORD
         shelf_rack_addr = constants.ETH_PARAM_RACK_SHELF
 
-        for device in self.devices_local:
+        coord_map = {}
+        for i, device in enumerate(self.devices_local):
             device = device.as_wh()
             neighbours = device.get_neighbouring_chips()
+
             if len(neighbours) > 0:
-                shelf = neighbours[0].eth_addr.rack_y
+                remote_shelf = neighbours[0].eth_addr.rack_y
+                remote_x = neighbours[0].eth_addr.shelf_x
+                remote_y = neighbours[0].eth_addr.shelf_y
             else:
                 print("no neighbours found")
                 continue
 
-            if shelf == 2:
+            if remote_shelf not in coord_map:
+                coord_map[remote_shelf] = {}
+
+            coord_map[remote_shelf][i] = (remote_x, remote_y)
+
+        for remote_shelf in coord_map:
+            # For all n150s connected to each remote shelf, sort them based on the remote x/y coordinate
+            # Then assign the local x/y coordinate based on the sorted order
+            sorted_coord_map = sorted(coord_map[remote_shelf].items(), key=lambda x: x[1])
+
+            if remote_shelf == 2:
                 nb_shelf = 3
-            elif shelf == 1:
+            elif remote_shelf == 1:
                 nb_shelf = 0
             else:
-                print("Invalid shelf")
+                print("Invalid remote shelf")
                 sys.exit(1)
+            shelf_rack = (nb_shelf << 8) | 0 # Set rack to 0 for now
 
-            shelf_rack = (shelf << 16) | 0 # Set rack to 0
-            device.spi_write(int(shelf_rack_addr), int(shelf_rack).to_bytes(4, byteorder="little"))
+            for i, (idx, _) in enumerate(sorted_coord_map):
+                device = self.devices_local[idx].as_wh()
+
+                xy = (i << 8) | 0
+                device.spi_write(int(xy_addr), int(xy).to_bytes(4, byteorder="little"))
+                device.spi_write(int(shelf_rack_addr), int(shelf_rack).to_bytes(4, byteorder="little"))
