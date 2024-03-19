@@ -267,14 +267,10 @@ def program_galaxy(topo_backend_octo: TopoBackend_Octopus):
     7. reset with retimer_sel and disable_sel and wait for training, and verify all chips show up
     """
     disabled_ports_before = [
-        "0:0",
-        "0:1",
-        "0:2",
-        "1:0",
-        "1:1",
-        "1:2",
-        "6:2",
-        "7:2",
+        "0:0", "0:1", "0:2",
+        "1:0", "1:1", "1:2",
+        "6:0", "6:1", "6:2",
+        "7:0", "7:1", "7:2",
     ]
 
     if topo_backend_octo.mobo_dict_list is None:
@@ -296,7 +292,8 @@ def program_galaxy(topo_backend_octo: TopoBackend_Octopus):
                 "nb_host_pci_idx": item["nb_host_pci_idx"],
                 "mobo": item["mobo"],
                 "credo": item["credo"],
-                "disabled_ports": disabled_ports_before,
+                # disabled_ports_before always disables all by default, should exclude the specified nb->galaxy ports in the config
+                "disabled_ports": list(set(disabled_ports_before) - set(item["credo"])),
             }
         )
         mobo_dict_after.append(
@@ -396,7 +393,7 @@ def main():
         )
         sys.exit(1)
 
-    # Quit if any board is not nb300
+    # Quit if any board is not in the accepted boards list
     for dev in devices:
         board_type = get_board_type(str(hex(dev.board_id())).replace("0x", ""))
         accepted_boards = ["n300", "n150", "GALAXY"]
