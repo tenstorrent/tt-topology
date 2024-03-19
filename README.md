@@ -76,6 +76,13 @@ optional arguments:
   -p [plot], --plot_filename [plot]
                         Change the plot of the png that will have the graph layout of the chips. Default:
                         chip_layout.png
+  -o, --octopus         octopus support in galaxy
+  -g [GENERATE_RESET_JSON], --generate_reset_json [GENERATE_RESET_JSON]
+                        Generate default reset json file that reset consumes. Default stored at ~/.config/tenstorrent/reset_config.json. Update the generated file and use it as an
+                        input for the --reset option
+  -r config.json, --reset config.json
+                        Provide a json file with reset configs. Generate a default reset json file with the -g option.
+
 ```
 # TT-Topology Procedure
 
@@ -139,6 +146,81 @@ For a host with four n300 cards, the command will generate a layout that looks a
   &nbsp; &nbsp;
   <img src="images/torus_layout.png?raw=true" alt="torus_layout_2x8" width="47%"/>
 </p>
+
+# Octopus(TGG/TG) Support in TT-Topology
+- TGG setting: 8 n150s connected to 2 galaxies
+- TG setting: 4 n150s connected to 1 galaxy
+
+## Usage
+1. Generate a default mobo reset json file saved at ```~/.config/tenstorrent/reset_config.json``` by running the following command
+
+    ```
+    $ tt-topology -g
+    ```
+
+2. Fill in *"mobo"*, *"credo"*, and *"disabled_ports"* under *"wh_mobo_reset"*
+
+    Here is an example of what your reset_config.json file may look like:
+    ```
+    {
+        "time": "2024-03-06T20:12:27.640859",
+        "host_name": "yyz-lab-212",
+        "gs_tensix_reset": {
+            "pci_index": []
+        },
+        "wh_link_reset": {
+            "pci_index": [
+                0,
+                1,
+                2,
+                3
+            ]
+        },
+        "re_init_devices": true,
+        "wh_mobo_reset": [
+            {
+                "nb_host_pci_idx": [
+                    0,
+                    1,
+                    2,
+                    3
+                  ],
+                "mobo": "mobo-ce-44",
+                "credo": [
+                    "6:0",
+                    "6:1",
+                    "7:0",
+                    "7:1"
+                ],
+                "disabled_ports": [
+                    "0:2",
+                    "1:2",
+                    "6:2",
+                    "7:2"
+                ]
+            }
+        ]
+    }
+    ```
+
+3. Flashing multiple NB cards to use specific eth routing configurations by running the following command
+
+    ```
+    $ tt-topology -o -r ~/.config/tenstorrent/reset_config.json
+    ```
+
+## Internal Procedure
+1. Setup `mobo_eth_en` on every local n150 to train with the Galaxy
+2. Program the shelf/rack of the Galaxies
+3. Program all local n150s to rack 0, shelf 0, x 0, y 0
+4. Reset with the following `retimer_sel` and `disable_sel` and wait for training
+    - `retimer_sel`: From the `credo` field of the reset json file for the specific Galaxy
+    - `disable_sel`: All the other ports not specified by the `retimer_sel`
+5. Check QSFP link and change shelf number for each n150 according to the shelf on the connected Galaxy
+6. Program the x, y coords of the local n150s based on the other side of the link
+7. Reset again with the `retimer_sel` and `disable_sel` and wait for training, and verify all chips show up
+    - `retimer_sel`: From the `credo` field of the reset json file for the specific Galaxy
+    - `disable_sel`: From the `disabled_ports` field of the reset json file for the specific Galaxy
 
 # Logging
 
