@@ -34,7 +34,7 @@ def detect_current_topology(devices: List[PciChip]):
     coord_list = []
     print(
         CMD_LINE_COLOR.PURPLE,
-        f"Devices on system: ",
+        "Devices on system: ",
         CMD_LINE_COLOR.ENDC,
     )
     for i, dev in enumerate(devices):
@@ -55,7 +55,7 @@ def detect_current_topology(devices: List[PciChip]):
     if all(element == (0, 0) or element == (1, 0) for element in coord_list):
         print(
             CMD_LINE_COLOR.YELLOW,
-            f"Configuration: Not flashed into a configuration",
+            "Configuration: Not flashed into a configuration",
             CMD_LINE_COLOR.ENDC,
         )
     elif all(
@@ -64,7 +64,7 @@ def detect_current_topology(devices: List[PciChip]):
     ):
         print(
             CMD_LINE_COLOR.YELLOW,
-            f"Configuration: Linear/Torus",
+            "Configuration: Linear/Torus",
             CMD_LINE_COLOR.ENDC,
         )
     elif all(
@@ -73,13 +73,13 @@ def detect_current_topology(devices: List[PciChip]):
     ):
         print(
             CMD_LINE_COLOR.YELLOW,
-            f"Configuration: Mesh",
+            "Configuration: Mesh",
             CMD_LINE_COLOR.ENDC,
         )
     else:
         print(
             CMD_LINE_COLOR.RED,
-            f"Cannot comprehend configuration!",
+            "Cannot comprehend configuration!",
             CMD_LINE_COLOR.ENDC,
         )
 
@@ -143,7 +143,7 @@ class TopoBackend:
     def get_eth_config_state(self):
         config_state = []
         config_state_log = []
-        for i, device in enumerate(self.devices):
+        for device in self.devices:
             dev_config_log = log.ChipConfig()
             wh_chip = device.as_wh()
             fw_version = bytearray(4)
@@ -169,7 +169,7 @@ class TopoBackend:
             dev_config_log.port_disable_l = data["port_disable_l"]
             dev_config_log.rack_shelf_l = data["rack_shelf_l"]
 
-            if not (device.is_remote()):
+            if not device.is_remote():
                 chip_coord_r = bytearray(4)
                 port_disable_r = bytearray(4)
                 rack_self_r = bytearray(4)
@@ -453,14 +453,14 @@ class TopoBackend:
                     else:
                         # check unused direction from the parent and assign coordinates
                         # X coord is unused
-                        if parent_used_coord[parent_node][0] == False:
+                        if not parent_used_coord[parent_node][0]:
                             coordinates[current_node] = (
                                 parent_x_coord + 1,
                                 parent_y_coord,
                             )
                             parent_used_coord[parent_node][0] = True
                         # Y is unused
-                        elif parent_used_coord[parent_node][1] == False:
+                        elif not parent_used_coord[parent_node][1]:
                             coordinates[current_node] = (
                                 parent_x_coord,
                                 parent_y_coord + 1,
@@ -647,7 +647,7 @@ class TopoBackend:
         for _, data in chip_data.items():
             board_id = data["board_id"]
             # If the chip is a nebula x2, perform the LtoR copy
-            if data["board_type"] == "n300" and not (data["chip_obj"].is_remote()):
+            if data["board_type"] == "n300" and not data["chip_obj"].is_remote():
                 try:
                     data["chip_obj"].arc_msg(
                         init_fw_defines("wormhole", "tt_topology")[
@@ -757,8 +757,8 @@ class TopoBackend_Octopus:
         for device in self.devices_local:
             device = device.as_wh()
             device.spi_write(
-                int(constants.MOBO_ETH_EN),
-                int(0xC3).to_bytes(constants.MOBO_ETH_EN_SIZE, byteorder="little"),
+                int(constants.ETH_PARAM_MOBO_ETH_EN),
+                int(0xC3).to_bytes(4, byteorder="little"),
             )
 
     def set_rack_shelf_remote(self, mobo_dict):
@@ -778,7 +778,7 @@ class TopoBackend_Octopus:
         xy_addr = constants.ETH_PARAM_CHIP_COORD
         rack_shelf_addr = constants.ETH_PARAM_RACK_SHELF
 
-        for i, device in enumerate(self.devices_local):
+        for device in self.devices_local:
             device = device.as_wh()
             device.spi_write(int(xy_addr), bytearray([0x0, 0x0, 0x0, 0x0]))
             device.spi_write(int(rack_shelf_addr), bytearray([0x0, 0x0, 0x0, 0x0]))
@@ -824,10 +824,10 @@ class TopoBackend_Octopus:
 
             coord_map[remote_shelf][i] = (remote_x, remote_y)
 
-        for remote_shelf in coord_map:
+        for remote_shelf, remote_coord_map in coord_map.items():
             # For all n150s connected to each remote shelf, sort them based on the remote x/y coordinate
             # Then assign the local x/y coordinate based on the sorted order
-            sorted_coord_map = sorted(coord_map[remote_shelf].items(), key=lambda x: x[1])
+            sorted_coord_map = sorted(remote_coord_map.items(), key=lambda x: x[1])
 
             if remote_shelf == 2:
                 nb_shelf = 3

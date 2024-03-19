@@ -13,11 +13,6 @@ import pkg_resources
 from pyluwen import detect_chips
 from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
-from tt_topology.backend import (
-    TopoBackend,
-    TopoBackend_Octopus,
-    detect_current_topology,
-)
 from tt_tools_common.utils_common.system_utils import (
     get_driver_version,
 )
@@ -27,6 +22,11 @@ from tt_tools_common.utils_common.tools_utils import (
 from tt_tools_common.reset_common.reset_utils import (
     generate_reset_logs,
     parse_reset_input,
+)
+from tt_topology.backend import (
+    TopoBackend,
+    TopoBackend_Octopus,
+    detect_current_topology,
 )
 
 
@@ -129,20 +129,20 @@ def run_and_flash(topo_backend: TopoBackend):
 
     print(
         CMD_LINE_COLOR.BLUE,
-        f"Starting flash on pcie chips to default state.",
+        "Starting flash on pcie chips to default state.",
         CMD_LINE_COLOR.ENDC,
     )
     # Flash to default state (nb300 - left is 0,0 and right is 1,0), then reset
     topo_backend.flash_to_default_state()
     print(
         CMD_LINE_COLOR.PURPLE,
-        f"Sleeping for 15s ...",
+        "Sleeping for 15s ...",
         CMD_LINE_COLOR.ENDC,
     )
     time.sleep(15)
     print(
         CMD_LINE_COLOR.BLUE,
-        f"Finished flashing pcie chips to default state.",
+        "Finished flashing pcie chips to default state.",
         CMD_LINE_COLOR.ENDC,
     )
 
@@ -188,7 +188,7 @@ def run_and_flash(topo_backend: TopoBackend):
 
     print(
         CMD_LINE_COLOR.BLUE,
-        f"Generated connection map: ",
+        "Generated connection map: ",
         CMD_LINE_COLOR.ENDC,
     )
     for _, data in connection_data.items():
@@ -200,7 +200,7 @@ def run_and_flash(topo_backend: TopoBackend):
             CMD_LINE_COLOR.ENDC,
         )
 
-    if topo_backend.layout == "linear" or topo_backend.layout == "torus":
+    if topo_backend.layout in ["linear", "torus"]:
         coordinates_map = topo_backend.generate_coordinates_torus_or_linear(
             connection_data
         )
@@ -225,13 +225,13 @@ def run_and_flash(topo_backend: TopoBackend):
     topo_backend.flash_to_specified_state(connection_data, coordinates_map)
     print(
         CMD_LINE_COLOR.PURPLE,
-        f"Sleeping for 15s ...",
+        "Sleeping for 15s ...",
         CMD_LINE_COLOR.ENDC,
     )
     time.sleep(15)
     print(
         CMD_LINE_COLOR.BLUE,
-        f"Finished flashing chips to generated coordinates.",
+        "Finished flashing chips to generated coordinates.",
         CMD_LINE_COLOR.ENDC,
     )
 
@@ -368,13 +368,13 @@ def main():
     if not driver:
         print(
             CMD_LINE_COLOR.RED,
-            "No Tenstorrent driver detected! Please install driver using tt-kmd: https://github.com/tenstorrent/tt-kmd ",
+            "No Tenstorrent driver detected! Please install driver using tt-kmd: https://github.com/tenstorrent/tt-kmd",
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(1)
 
     args = parse_args()
-    local_only = True if not args.list else False
+    local_only = not args.list
 
     try:
         devices = detect_chips(local_only=local_only)
@@ -400,7 +400,7 @@ def main():
         if board_type not in accepted_boards:
             print(
                 CMD_LINE_COLOR.RED,
-                f"TT-Topology will only run on nb300/nb150/GALAXY boards. Detected another board type - {board_type}. Exiting...",
+                f"TT-Topology will only run on n300/n150/GALAXY boards. Detected another board type - {board_type}. Exiting...",
                 CMD_LINE_COLOR.ENDC,
             )
             sys.exit(1)
@@ -419,14 +419,12 @@ def main():
         )
         print(
             CMD_LINE_COLOR.YELLOW,
-            f"Update the generated file and use it as an input for the -r/--reset option.",
+            "Update the generated file and use it as an input for the -r/--reset option.",
             CMD_LINE_COLOR.ENDC,
         )
-
         sys.exit(0)
 
     if args.octopus:
-        devices = detect_chips(local_only=True)
         if args.reset is not None:
             mobo_dict_list = args.reset
         else:
