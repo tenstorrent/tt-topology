@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2024 Tenstorrent Inc.
+# SPDX-License-Identifier: Apache-2.0
+
 from tt_tools_common.reset_common.galaxy_reset import GalaxyReset
 
 
