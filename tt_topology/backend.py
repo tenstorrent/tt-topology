@@ -6,8 +6,7 @@ import datetime
 from pathlib import Path
 import networkx as nx
 from typing import List
-from pyluwen import PciChip
-from tt_topology import log
+from pyluwen import PciChip, detect_chips_fallible
 from collections import deque
 import matplotlib.pyplot as plt
 import tt_topology.constants as constants
@@ -18,6 +17,10 @@ from tt_tools_common.utils_common.tools_utils import (
     init_logging,
 )
 from tt_tools_common.utils_common.system_utils import get_host_info
+from tt_tools_common.reset_common.galaxy_reset import GalaxyReset
+from tt_tools_common.reset_common.wh_reset import WHChipReset
+from tt_tools_common.reset_common import host_reset_log
+from tt_topology import log
 
 LOG_FOLDER = os.path.expanduser("~/tt_topology_logs/")
 
@@ -31,7 +34,7 @@ def detect_current_topology(devices: List[PciChip]):
     coord_list = []
     print(
         CMD_LINE_COLOR.PURPLE,
-        f"Devices on system: ",
+        "Devices on system: ",
         CMD_LINE_COLOR.ENDC,
     )
     for i, dev in enumerate(devices):
@@ -52,7 +55,7 @@ def detect_current_topology(devices: List[PciChip]):
     if all(element == (0, 0) or element == (1, 0) for element in coord_list):
         print(
             CMD_LINE_COLOR.YELLOW,
-            f"Configuration: Not flashed into a configuration",
+            "Configuration: Not flashed into a configuration",
             CMD_LINE_COLOR.ENDC,
         )
     elif all(
@@ -61,7 +64,7 @@ def detect_current_topology(devices: List[PciChip]):
     ):
         print(
             CMD_LINE_COLOR.YELLOW,
-            f"Configuration: Linear/Torus",
+            "Configuration: Linear/Torus",
             CMD_LINE_COLOR.ENDC,
         )
     elif all(
@@ -70,13 +73,13 @@ def detect_current_topology(devices: List[PciChip]):
     ):
         print(
             CMD_LINE_COLOR.YELLOW,
-            f"Configuration: Mesh",
+            "Configuration: Mesh",
             CMD_LINE_COLOR.ENDC,
         )
     else:
         print(
             CMD_LINE_COLOR.RED,
-            f"Cannot comprehend configuration!",
+            "Cannot comprehend configuration!",
             CMD_LINE_COLOR.ENDC,
         )
 
@@ -140,7 +143,7 @@ class TopoBackend:
     def get_eth_config_state(self):
         config_state = []
         config_state_log = []
-        for i, device in enumerate(self.devices):
+        for device in self.devices:
             dev_config_log = log.ChipConfig()
             wh_chip = device.as_wh()
             fw_version = bytearray(4)
@@ -166,7 +169,7 @@ class TopoBackend:
             dev_config_log.port_disable_l = data["port_disable_l"]
             dev_config_log.rack_shelf_l = data["rack_shelf_l"]
 
-            if not (device.is_remote()):
+            if not device.is_remote():
                 chip_coord_r = bytearray(4)
                 port_disable_r = bytearray(4)
                 rack_self_r = bytearray(4)
@@ -450,14 +453,14 @@ class TopoBackend:
                     else:
                         # check unused direction from the parent and assign coordinates
                         # X coord is unused
-                        if parent_used_coord[parent_node][0] == False:
+                        if not parent_used_coord[parent_node][0]:
                             coordinates[current_node] = (
                                 parent_x_coord + 1,
                                 parent_y_coord,
                             )
                             parent_used_coord[parent_node][0] = True
                         # Y is unused
-                        elif parent_used_coord[parent_node][1] == False:
+                        elif not parent_used_coord[parent_node][1]:
                             coordinates[current_node] = (
                                 parent_x_coord,
                                 parent_y_coord + 1,
@@ -644,7 +647,7 @@ class TopoBackend:
         for _, data in chip_data.items():
             board_id = data["board_id"]
             # If the chip is a nebula x2, perform the LtoR copy
-            if data["board_type"] == "n300" and not (data["chip_obj"].is_remote()):
+            if data["board_type"] == "n300" and not data["chip_obj"].is_remote():
                 try:
                     data["chip_obj"].arc_msg(
                         init_fw_defines("wormhole", "tt_topology")[
@@ -733,3 +736,111 @@ class TopoBackend:
             f"Saved board layout to {self.plot_filename}",
             CMD_LINE_COLOR.ENDC,
         )
+
+
+class TopoBackend_Octopus:
+    def __init__(
+        self,
+        devices: List[PciChip],
+        mobo_dict_list: List[dict],
+    ):
+        self.devices_local = devices
+        self.devices_remote = [
+            entry["mobo"] for entry in mobo_dict_list["wh_mobo_reset"]
+        ]
+        self.mobo_dict_list = mobo_dict_list
+
+    def eth_mobo_enable(self):
+        """
+        Set eth-mobo-enable on every n150
+        """
+        for device in self.devices_local:
+            device = device.as_wh()
+            device.spi_write(
+                int(constants.ETH_PARAM_MOBO_ETH_EN),
+                int(0xC3).to_bytes(4, byteorder="little"),
+            )
+
+    def set_rack_shelf_remote(self, mobo_dict):
+        mobo_list = [entry["mobo"] for entry in mobo_dict]
+        galaxy_reset_obj = GalaxyReset()
+        for i, mobo in enumerate(mobo_list):
+            cmd = "rackshelf"
+            data = {"rack": 0, "shelf": i + 1}
+            galaxy_reset_obj.server_communication(
+                post=True, mobo=mobo, command=cmd, data=data
+            )
+
+    def set_initial_chip_coords(self):
+        """
+        Setup the initial chip coordinated to be all R0, S0, X0, Y0
+        """
+        xy_addr = constants.ETH_PARAM_CHIP_COORD
+        rack_shelf_addr = constants.ETH_PARAM_RACK_SHELF
+
+        for device in self.devices_local:
+            device = device.as_wh()
+            device.spi_write(int(xy_addr), bytearray([0x0, 0x0, 0x0, 0x0]))
+            device.spi_write(int(rack_shelf_addr), bytearray([0x0, 0x0, 0x0, 0x0]))
+
+    def galaxy_reset(self, mobo_dict):
+        """
+        Reset all galaxies
+        """
+        mobo_reset_obj = GalaxyReset()
+        mobo_reset_obj.warm_reset_mobo(mobo_dict)
+
+        chips = detect_chips_fallible(local_only=True, noc_safe=False)
+        for device in chips:
+            device.init()
+
+    def read_remote_set_local(self):
+        """
+        Based on the remote coordinates, set the local coordinates
+        The n150s connected to shelf 1 in a TGG should stay shelf 0
+        The n150s connected to shelf 2 in a TGG should become shelf 3
+
+        On each shelf for the n150s, the y coordinates should be set to 0,1,2,3 based on
+        where they connect to on the galaxy
+        """
+        xy_addr = constants.ETH_PARAM_CHIP_COORD
+        shelf_rack_addr = constants.ETH_PARAM_RACK_SHELF
+
+        coord_map = {}
+        for i, device in enumerate(self.devices_local):
+            device = device.as_wh()
+            neighbours = device.get_neighbouring_chips()
+
+            if len(neighbours) > 0:
+                remote_shelf = neighbours[0].eth_addr.rack_y
+                remote_x = neighbours[0].eth_addr.shelf_x
+                remote_y = neighbours[0].eth_addr.shelf_y
+            else:
+                print("no neighbours found")
+                continue
+
+            if remote_shelf not in coord_map:
+                coord_map[remote_shelf] = {}
+
+            coord_map[remote_shelf][i] = (remote_x, remote_y)
+
+        for remote_shelf, remote_coord_map in coord_map.items():
+            # For all n150s connected to each remote shelf, sort them based on the remote x/y coordinate
+            # Then assign the local x/y coordinate based on the sorted order
+            sorted_coord_map = sorted(remote_coord_map.items(), key=lambda x: x[1])
+
+            if remote_shelf == 2:
+                nb_shelf = 3
+            elif remote_shelf == 1:
+                nb_shelf = 0
+            else:
+                print("Invalid remote shelf")
+                sys.exit(1)
+            shelf_rack = (nb_shelf << 8) | 0 # Set rack to 0 for now
+
+            for i, (idx, _) in enumerate(sorted_coord_map):
+                device = self.devices_local[idx].as_wh()
+
+                xy = (i << 8) | 0
+                device.spi_write(int(xy_addr), int(xy).to_bytes(4, byteorder="little"))
+                device.spi_write(int(shelf_rack_addr), int(shelf_rack).to_bytes(4, byteorder="little"))

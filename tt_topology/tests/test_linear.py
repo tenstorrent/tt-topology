@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """Given a graph of nodes, generate a set of coordinates that makes a fully connected cycle """
 import os
-import json
 import networkx as nx
 
 os.environ["MPLCONFIGDIR"] = os.getcwd() + "/configs/"
