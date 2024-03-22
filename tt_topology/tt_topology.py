@@ -110,7 +110,7 @@ def parse_args():
         dest="reset",
     )
 
-    return parser.parse_args()
+    return parser
 
 
 def run_and_flash(topo_backend: TopoBackend):
@@ -267,10 +267,18 @@ def program_galaxy(topo_backend_octo: TopoBackend_Octopus):
     7. reset with retimer_sel and disable_sel and wait for training, and verify all chips show up
     """
     disabled_ports_before = [
-        "0:0", "0:1", "0:2",
-        "1:0", "1:1", "1:2",
-        "6:0", "6:1", "6:2",
-        "7:0", "7:1", "7:2",
+        "0:0",
+        "0:1",
+        "0:2",
+        "1:0",
+        "1:1",
+        "1:2",
+        "6:0",
+        "6:1",
+        "6:2",
+        "7:0",
+        "7:1",
+        "7:2",
     ]
 
     if topo_backend_octo.mobo_dict_list is None:
@@ -318,7 +326,9 @@ def program_galaxy(topo_backend_octo: TopoBackend_Octopus):
 
     topo_backend_octo.galaxy_reset(mobo_dict_before)
 
-    print("check QSFP link and change rack, shelf, x, y coordinated for each of the local n150s")
+    print(
+        "check QSFP link and change rack, shelf, x, y coordinated for each of the local n150s"
+    )
     topo_backend_octo.read_remote_set_local()
 
     print(
@@ -373,7 +383,16 @@ def main():
         )
         sys.exit(1)
 
-    args = parse_args()
+    parser = parse_args()
+    args = parser.parse_args()
+    if not len(sys.argv) > 1:
+        # No arguments have been provided - print help and exit
+        print(
+            f"{CMD_LINE_COLOR.RED}No arguments provided! Please provide the required arguments....{CMD_LINE_COLOR.ENDC}"
+        )
+        parser.print_usage()
+        sys.exit(1)
+
     local_only = not args.list
 
     try:
