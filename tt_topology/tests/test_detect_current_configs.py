@@ -1,14 +1,14 @@
 # SPDX-FileCopyrightText: © 2024 Tenstorrent Inc.
 # SPDX-License-Identifier: Apache-2.0
-from pyluwen import detect_chips
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.utils_common.tools_utils import (
     get_board_type,
+    detect_chips_with_callback,
 )
 
 
 def main():
-    devices = detect_chips()
+    devices = detect_chips_with_callback()
     coord_list = []
     print(
         CMD_LINE_COLOR.PURPLE,

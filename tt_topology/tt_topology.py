@@ -10,7 +10,6 @@ import sys
 import time
 import argparse
 import pkg_resources
-from pyluwen import detect_chips
 from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.utils_common.system_utils import (
@@ -18,6 +17,7 @@ from tt_tools_common.utils_common.system_utils import (
 )
 from tt_tools_common.utils_common.tools_utils import (
     get_board_type,
+    detect_chips_with_callback,
 )
 from tt_tools_common.reset_common.reset_utils import (
     generate_reset_logs,
@@ -167,7 +167,7 @@ def run_and_flash(topo_backend: TopoBackend):
 
     # wait time to make sure devices enumerate
     # Detect all devices, including remote
-    topo_backend.devices = detect_chips()
+    topo_backend.devices = detect_chips_with_callback()
 
     print(
         CMD_LINE_COLOR.PURPLE,
@@ -243,7 +243,7 @@ def run_and_flash(topo_backend: TopoBackend):
         CMD_LINE_COLOR.ENDC,
     )
     reset_devices = reset_obj.full_lds_reset(pci_interfaces)
-    chips = detect_chips()
+    chips = detect_chips_with_callback()
     print(
         CMD_LINE_COLOR.BLUE,
         f"Completed reset on {len(chips)} chips",
@@ -339,9 +339,10 @@ def program_galaxy(topo_backend_octo: TopoBackend_Octopus):
 
     # wait time to make sure devices enumerate
     # Detect all devices, including remote
-    print("detecting all devices after reset...")
-    post_reset_devices_local = detect_chips(local_only=True)
-    post_reset_devices = detect_chips(local_only=False)
+    print("detecting all local devices after reset...")
+    post_reset_devices_local = detect_chips_with_callback(local_only=True)
+    print("detecting all local and remote devices after reset...")
+    post_reset_devices = detect_chips_with_callback(local_only=False)
 
     if len(topo_backend_octo.devices_local) != len(post_reset_devices_local):
         print(
@@ -396,7 +397,7 @@ def main():
     local_only = not args.list
 
     try:
-        devices = detect_chips(local_only=local_only)
+        devices = detect_chips_with_callback(local_only=local_only)
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
