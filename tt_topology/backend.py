@@ -6,7 +6,7 @@ import datetime
 from pathlib import Path
 import networkx as nx
 from typing import List
-from pyluwen import PciChip, detect_chips_fallible
+from pyluwen import PciChip
 from collections import deque
 import matplotlib.pyplot as plt
 import tt_topology.constants as constants
@@ -15,11 +15,10 @@ from tt_tools_common.utils_common.tools_utils import (
     init_fw_defines,
     get_board_type,
     init_logging,
+    detect_chips_with_callback,
 )
 from tt_tools_common.utils_common.system_utils import get_host_info
 from tt_tools_common.reset_common.galaxy_reset import GalaxyReset
-from tt_tools_common.reset_common.wh_reset import WHChipReset
-from tt_tools_common.reset_common import host_reset_log
 from tt_topology import log
 
 LOG_FOLDER = os.path.expanduser("~/tt_topology_logs/")
@@ -790,7 +789,7 @@ class TopoBackend_Octopus:
         mobo_reset_obj = GalaxyReset()
         mobo_reset_obj.warm_reset_mobo(mobo_dict)
 
-        chips = detect_chips_fallible(local_only=True, noc_safe=False)
+        chips = detect_chips_with_callback(local_only=True, ignore_ethernet=False)
         for device in chips:
             device.init()
 
@@ -836,11 +835,14 @@ class TopoBackend_Octopus:
             else:
                 print("Invalid remote shelf")
                 sys.exit(1)
-            shelf_rack = (nb_shelf << 8) | 0 # Set rack to 0 for now
+            shelf_rack = (nb_shelf << 8) | 0  # Set rack to 0 for now
 
             for i, (idx, _) in enumerate(sorted_coord_map):
                 device = self.devices_local[idx].as_wh()
 
                 xy = (i << 8) | 0
                 device.spi_write(int(xy_addr), int(xy).to_bytes(4, byteorder="little"))
-                device.spi_write(int(shelf_rack_addr), int(shelf_rack).to_bytes(4, byteorder="little"))
+                device.spi_write(
+                    int(shelf_rack_addr),
+                    int(shelf_rack).to_bytes(4, byteorder="little"),
+                )
