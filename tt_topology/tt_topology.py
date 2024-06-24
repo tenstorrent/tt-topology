@@ -113,6 +113,17 @@ def parse_args():
 
     return parser
 
+def restrict_chip_ids(devices, reset_idx, local_only=False):
+    total_number_of_devices = len(devices)
+    assert total_number_of_devices % 2 == 0, "Odd Number of Devices Detected"
+    devices_selected = []
+    for idx in reset_idx:
+        devices_selected.append(devices[idx])
+    if not local_only:
+        for idx in reset_idx:
+            devices_selected.append(devices[idx + (total_number_of_devices//2)])
+    return devices_selected
+
 
 def run_and_flash(topo_backend: TopoBackend, reset_idx: List[int]):
     """
@@ -169,6 +180,8 @@ def run_and_flash(topo_backend: TopoBackend, reset_idx: List[int]):
     # wait time to make sure devices enumerate
     # Detect all devices, including remote
     topo_backend.devices = detect_chips_with_callback()
+    if reset_idx:
+        topo_backend.devices = restrict_chip_ids(topo_backend.devices, reset_idx)
 
     print(
         CMD_LINE_COLOR.PURPLE,
@@ -245,6 +258,8 @@ def run_and_flash(topo_backend: TopoBackend, reset_idx: List[int]):
     )
     reset_devices = reset_obj.full_lds_reset(pci_interfaces)
     chips = detect_chips_with_callback()
+    if reset_idx:
+        chips = restrict_chip_ids(chips, reset_idx)
     print(
         CMD_LINE_COLOR.BLUE,
         f"Completed reset on {len(chips)} chips",
@@ -399,6 +414,8 @@ def main():
 
     try:
         devices = detect_chips_with_callback(local_only=local_only)
+        if args.reset:
+            devices = restrict_chip_ids(devices, args.reset, local_only=local_only)
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
