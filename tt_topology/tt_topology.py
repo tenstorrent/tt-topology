@@ -10,6 +10,7 @@ import sys
 import time
 import argparse
 import pkg_resources
+from typing import List
 from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.utils_common.system_utils import (
@@ -112,8 +113,19 @@ def parse_args():
 
     return parser
 
+def restrict_chip_ids(devices, reset_idx, local_only=False):
+    total_number_of_devices = len(devices)
+    assert total_number_of_devices % 2 == 0, "Odd Number of Devices Detected"
+    devices_selected = []
+    for idx in reset_idx:
+        devices_selected.append(devices[idx])
+    if not local_only:
+        for idx in reset_idx:
+            devices_selected.append(devices[idx + (total_number_of_devices//2)])
+    return devices_selected
 
-def run_and_flash(topo_backend: TopoBackend):
+
+def run_and_flash(topo_backend: TopoBackend, reset_idx: List[int]):
     """
     Main function of tt-topology. Performs the following steps -
     1. Flash all the boards to default - set all eth port disables to 0 and reset coordinates.
@@ -152,7 +164,7 @@ def run_and_flash(topo_backend: TopoBackend):
     # Reset all pci devices
     num_local_chips = len(topo_backend.devices)
     reset_obj = WHChipReset()
-    pci_interfaces = list(range(num_local_chips))
+    pci_interfaces = reset_idx
     print(
         CMD_LINE_COLOR.BLUE,
         f"Initiating reset on chips at pcie interface: {pci_interfaces}",
@@ -168,6 +180,8 @@ def run_and_flash(topo_backend: TopoBackend):
     # wait time to make sure devices enumerate
     # Detect all devices, including remote
     topo_backend.devices = detect_chips_with_callback()
+    if reset_idx:
+        topo_backend.devices = restrict_chip_ids(topo_backend.devices, reset_idx)
 
     print(
         CMD_LINE_COLOR.PURPLE,
@@ -236,7 +250,7 @@ def run_and_flash(topo_backend: TopoBackend):
     )
 
     topo_backend.get_eth_config_state()
-    pci_interfaces = list(range(num_local_chips))
+    pci_interfaces = reset_idx
     print(
         CMD_LINE_COLOR.BLUE,
         f"Initiating reset on chips at pcie interface: {pci_interfaces}",
@@ -244,6 +258,8 @@ def run_and_flash(topo_backend: TopoBackend):
     )
     reset_devices = reset_obj.full_lds_reset(pci_interfaces)
     chips = detect_chips_with_callback()
+    if reset_idx:
+        chips = restrict_chip_ids(chips, reset_idx)
     print(
         CMD_LINE_COLOR.BLUE,
         f"Completed reset on {len(chips)} chips",
@@ -398,6 +414,8 @@ def main():
 
     try:
         devices = detect_chips_with_callback(local_only=local_only)
+        if args.reset:
+            devices = restrict_chip_ids(devices, args.reset, local_only=local_only)
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
@@ -463,7 +481,7 @@ def main():
         topo_backend = TopoBackend(devices, args.layout, args.plot)
         errors = False
     try:
-        run_and_flash(topo_backend)
+        run_and_flash(topo_backend, args.reset)
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
