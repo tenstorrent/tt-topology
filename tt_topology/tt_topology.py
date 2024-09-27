@@ -10,6 +10,7 @@ import sys
 import time
 import argparse
 import pkg_resources
+from typing import List
 from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.utils_common.system_utils import (
@@ -113,7 +114,7 @@ def parse_args():
     return parser
 
 
-def run_and_flash(topo_backend: TopoBackend):
+def run_and_flash(topo_backend: TopoBackend, reset_idx: List[int]):
     """
     Main function of tt-topology. Performs the following steps -
     1. Flash all the boards to default - set all eth port disables to 0 and reset coordinates.
@@ -152,7 +153,7 @@ def run_and_flash(topo_backend: TopoBackend):
     # Reset all pci devices
     num_local_chips = len(topo_backend.devices)
     reset_obj = WHChipReset()
-    pci_interfaces = list(range(num_local_chips))
+    pci_interfaces = reset_idx
     print(
         CMD_LINE_COLOR.BLUE,
         f"Initiating reset on chips at pcie interface: {pci_interfaces}",
@@ -236,7 +237,7 @@ def run_and_flash(topo_backend: TopoBackend):
     )
 
     topo_backend.get_eth_config_state()
-    pci_interfaces = list(range(num_local_chips))
+    pci_interfaces = reset_idx
     print(
         CMD_LINE_COLOR.BLUE,
         f"Initiating reset on chips at pcie interface: {pci_interfaces}",
@@ -463,7 +464,7 @@ def main():
         topo_backend = TopoBackend(devices, args.layout, args.plot)
         errors = False
     try:
-        run_and_flash(topo_backend)
+        run_and_flash(topo_backend, args.reset)
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
