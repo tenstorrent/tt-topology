@@ -27,8 +27,8 @@ dependencies = [
   'black==24.3.0',
   'elasticsearch==8.11.0',
   'pydantic>=1.2',
-  'pyluwen @ git+https://github.com/tenstorrent/luwen.git@v0.3.8#subdirectory=crates/pyluwen',
-  'tt_tools_common @ git+https://github.com/tenstorrent/tt-tools-common.git@v1.4.6',
+  'pyluwen @ git+https://github.com/tenstorrent/luwen.git@v0.4.9#subdirectory=crates/pyluwen',
+  'tt_tools_common @ git+https://github.com/tenstorrent/tt-tools-common.git@v1.4.11',
   'pre-commit==3.5.0',
   'networkx==3.1',
   'matplotlib==3.7.4'
