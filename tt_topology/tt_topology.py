@@ -9,6 +9,7 @@ to flash ethernet coordinates when multiple NB's are connected together.
 import sys
 import time
 import argparse
+import traceback
 import pkg_resources
 from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
@@ -483,10 +484,10 @@ def main():
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
-            e,
+            traceback.format_exc(),
             CMD_LINE_COLOR.ENDC,
         )
-        topo_backend.log.errors = str(e)
+        topo_backend.log.errors = str(traceback.format_exc())
         errors = True
     finally:
         # Still collect the log if something went wrong
