@@ -43,9 +43,9 @@ def parse_args():
     parser.add_argument(
         "-l",
         "--layout",
-        choices=["linear", "torus", "mesh"],
+        choices=["linear", "torus", "mesh", "isolated"],
         default="linear",
-        help="Select the layout (linear, torus, mesh). Default is linear.",
+        help="Select the layout (linear, torus, mesh, isolated). Default is linear.",
     )
     parser.add_argument(
         "-o",
@@ -183,6 +183,14 @@ def run_and_flash(topo_backend: TopoBackend):
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(1)
+
+    if topo_backend.layout == "isolated":
+        print(
+                CMD_LINE_COLOR.BLUE,
+                f"Boards flashed to default isolated state. Exiting.",
+                CMD_LINE_COLOR.ENDC,
+                )
+        sys.exit(0)
 
     connection_data = topo_backend.generate_connection_map()
 
