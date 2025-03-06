@@ -206,7 +206,7 @@ class TopoBackend:
         for data in config_state:
             assert (
                 data["fw_version"] == config_state[0]["fw_version"]
-            ), "Firmware versions do not match"
+            ), f"Firmware versions do not match: {data['fw_version']} != {config_state[0]['fw_version']}"
         if not self.log.starting_configs:
             self.log.starting_configs = config_state_log
         elif not self.log.post_default_flashing_configs:
@@ -296,6 +296,24 @@ class TopoBackend:
                 CMD_LINE_COLOR.ENDC,
             )
 
+    def get_local_eth_board_info(self, chip):
+        """
+        Get the local board info from noc, making it eth fw version agnostic
+        """
+        local_board_id = bytearray(4)
+        local_board_type = bytearray(4)
+
+        for port in range(16):
+            eth_x, eth_y = self.eth_xy_decode(port)
+            chip.noc_read(0, eth_x, eth_y, constants.ETH_TEST_RESULT_LOCAL_TYPE, local_board_type)
+
+            if int.from_bytes(local_board_type, "little") != 0:
+                chip.noc_read(0, eth_x, eth_y, constants.ETH_TEST_RESULT_LOCAL_ID, local_board_id)
+                local_board_type = int.from_bytes(local_board_type, "little")
+                local_board_id = int.from_bytes(local_board_id, "little")
+                local_board_info = f"{(local_board_type << 32) | local_board_id:016x}"
+                return local_board_info
+
     def generate_connection_map(self):
         """
         Generate an map with chip data and a list of connections
@@ -314,15 +332,7 @@ class TopoBackend:
             chip = device.as_wh()
             board_id = str(hex(device.board_id())).replace("0x", "")
             board_type = get_board_type(board_id)
-
-            # print(board_id, board_type)
-            eth_board_type = bytearray(4)
-            eth_board_id = bytearray(4)
-            chip.noc_read(0, 9, 0, constants.ETH_L1_PARAM_BOARD_TYPE, eth_board_type)
-            chip.noc_read(0, 9, 0, constants.ETH_L1_PARAM_BOARD_ID, eth_board_id)
-            eth_board_type = int.from_bytes(eth_board_type, "little")
-            eth_board_id = int.from_bytes(eth_board_id, "little")
-            eth_board_info = f"{(eth_board_type << 32) | eth_board_id:016x}"
+            eth_board_info = self.get_local_eth_board_info(chip)
 
             chip_data[eth_board_info] = {
                 "id": idx,
@@ -357,6 +367,10 @@ class TopoBackend:
                     connection_map_log_obj = log_obj
                     break
 
+            # get fw version and collect remote_info accordingly
+            chip_eth_fw_ver = bytearray(4)
+            chip.spi_read(int(constants.ETH_FW_VERSION_ADDR), chip_eth_fw_ver)
+            chip_eth_fw_ver = int.from_bytes(chip_eth_fw_ver, "little")
             # Go through all 16 ETH ports and read their remote chip ids (if applicable)
             # Use those IDs to construct the vectorized representation
             for port in range(16):

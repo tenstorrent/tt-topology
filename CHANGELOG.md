@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.2.0 - 06/03/2025
+
+### Fixed
+
+- Updated how local eth board info is calculated to make it agnostic to eth fw version
+- bumped tt-tools-common version
+- Added traceback printing when catching exceptions in main.
+
 ## 1.1.5 - 14/05/2024
 
 ### Updated
