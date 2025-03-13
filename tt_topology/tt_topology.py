@@ -147,9 +147,6 @@ def run_and_flash(topo_backend: TopoBackend):
         CMD_LINE_COLOR.ENDC,
     )
 
-    # Add new config to make sure flash happened correctly
-    topo_backend.get_eth_config_state()
-
     # Reset all pci devices
     num_local_chips = len(topo_backend.devices)
     reset_obj = WHChipReset()
@@ -165,6 +162,9 @@ def run_and_flash(topo_backend: TopoBackend):
         f"Completed reset on {len(reset_devices)} chips",
         CMD_LINE_COLOR.ENDC,
     )
+
+    # Add new config to make sure flash happened correctly
+    topo_backend.get_eth_config_state()
 
     # wait time to make sure devices enumerate
     # Detect all devices, including remote
@@ -236,7 +236,6 @@ def run_and_flash(topo_backend: TopoBackend):
         CMD_LINE_COLOR.ENDC,
     )
 
-    topo_backend.get_eth_config_state()
     pci_interfaces = list(range(num_local_chips))
     print(
         CMD_LINE_COLOR.BLUE,
@@ -244,13 +243,16 @@ def run_and_flash(topo_backend: TopoBackend):
         CMD_LINE_COLOR.ENDC,
     )
     reset_devices = reset_obj.full_lds_reset(pci_interfaces)
-    chips = detect_chips_with_callback()
+    topo_backend.devices = detect_chips_with_callback()
     print(
         CMD_LINE_COLOR.BLUE,
-        f"Completed reset on {len(chips)} chips",
+        f"Completed reset on {len(topo_backend.devices)} chips",
         CMD_LINE_COLOR.ENDC,
     )
     print()
+
+    # Get the final eth config state
+    topo_backend.get_eth_config_state()
 
     # Generate graph visualization
     topo_backend.graph_visualization(connection_data, coordinates_map)
