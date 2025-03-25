@@ -54,7 +54,7 @@ def detect_current_topology(devices: List[PciChip]):
     if all(element == (0, 0) or element == (1, 0) for element in coord_list):
         print(
             CMD_LINE_COLOR.YELLOW,
-            "Configuration: Not flashed into a configuration",
+            "Configuration: Isolated or not configured",
             CMD_LINE_COLOR.ENDC,
         )
     elif all(
