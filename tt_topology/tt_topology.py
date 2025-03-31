@@ -200,7 +200,7 @@ def run_and_flash(topo_backend: TopoBackend):
 
     if num_connections_missing:
         print(
-            CMD_LINE_COLOR.BLUE,
+            CMD_LINE_COLOR.RED,
             f"Detected {num_connections_missing} missing physical connection(s)! It's possible cables are loose or missing.",
             CMD_LINE_COLOR.ENDC,
         )
