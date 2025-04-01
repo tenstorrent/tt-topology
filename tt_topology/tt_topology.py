@@ -44,9 +44,9 @@ def parse_args():
     parser.add_argument(
         "-l",
         "--layout",
-        choices=["linear", "torus", "mesh"],
+        choices=["linear", "torus", "mesh", "isolated"],
         default="linear",
-        help="Select the layout (linear, torus, mesh). Default is linear.",
+        help="Select the layout (linear, torus, mesh, isolated). Default is linear.",
     )
     parser.add_argument(
         "-o",
@@ -185,7 +185,25 @@ def run_and_flash(topo_backend: TopoBackend):
         )
         sys.exit(1)
 
+    if topo_backend.layout == "isolated":
+        print(
+            CMD_LINE_COLOR.BLUE,
+            f"Boards flashed to default isolated state. Exiting.",
+            CMD_LINE_COLOR.ENDC,
+        )
+        sys.exit(0)
+
     connection_data = topo_backend.generate_connection_map()
+    num_connections_missing = topo_backend.check_num_available_connections(
+        connection_data
+    )
+
+    if num_connections_missing:
+        print(
+            CMD_LINE_COLOR.RED,
+            f"Detected {num_connections_missing} missing physical connection(s)! It's possible cables are loose or missing.",
+            CMD_LINE_COLOR.ENDC,
+        )
 
     print(
         CMD_LINE_COLOR.BLUE,
@@ -416,17 +434,25 @@ def main():
         )
         sys.exit(1)
 
-    # Quit if any board is not in the accepted boards list
+    # Warn the user if any board is not in the accepted boards list
+    supported_devices = []
+    unsupported_device_names = []
     for dev in devices:
         board_type = get_board_type(str(hex(dev.board_id())).replace("0x", ""))
-        accepted_boards = ["n300", "n150", "GALAXY"]
-        if board_type not in accepted_boards:
-            print(
-                CMD_LINE_COLOR.RED,
-                f"TT-Topology will only run on n300/n150/GALAXY boards. Detected another board type - {board_type}. Exiting...",
-                CMD_LINE_COLOR.ENDC,
-            )
-            sys.exit(1)
+        supported_boards = ["n300", "n150", "GALAXY"]
+        if board_type in supported_boards:
+            supported_devices.append(dev)
+        else:
+            unsupported_device_names.append(board_type)
+    # Notify the user; empty lists are falsy
+    if unsupported_device_names:
+        print(
+            CMD_LINE_COLOR.YELLOW,
+            f"TT-Topology will only run on n300/n150/GALAXY boards.\n Ignoring these devices: {', '.join(unsupported_device_names)}.",
+            CMD_LINE_COLOR.ENDC,
+        )
+    # Proceed with only supported devices
+    devices = supported_devices
 
     # List devices and config and exit
     if args.list:

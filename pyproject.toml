@@ -1,6 +1,6 @@
 [project]
 name = "tt-topology"
-version = "1.2.3"
+version = "1.2.4"
 description = "ethernet topology configuration tool for Tenstorrent silicon"
 readme = "README.md"
 requires-python = ">=3.7"
@@ -31,7 +31,8 @@ dependencies = [
   'tt_tools_common @ git+https://github.com/tenstorrent/tt-tools-common.git@v1.4.14',
   'pre-commit==3.5.0',
   'networkx==3.1',
-  'matplotlib==3.7.4'
+  'matplotlib==3.7.4',
+  'setuptools==75.3.0',
 ]
 
 [project.urls]

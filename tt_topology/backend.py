@@ -54,7 +54,7 @@ def detect_current_topology(devices: List[PciChip]):
     if all(element == (0, 0) or element == (1, 0) for element in coord_list):
         print(
             CMD_LINE_COLOR.YELLOW,
-            "Configuration: Not flashed into a configuration",
+            "Configuration: Isolated or not configured",
             CMD_LINE_COLOR.ENDC,
         )
     elif all(
@@ -355,7 +355,7 @@ class TopoBackend:
         # It will also have a list of connection types - X : Regular, T : Tfly
         # Simplified example for 2 NBx2s connected with QSFP cables:
         # a: {"id": 0, connections: [(1, "X"), (2, "X")]}
-        # b: {"id": 1, connections: [(0, "X"), (3, "X")]}
+        # b: {"id": 1, connections: [(0, "X"), (3, "T")]}
         # c: {"id": 2, connections: [(0, "X"), (3, "X")]}
         # d: {"id": 3, connections: [(1, "T"), (2, "X")]}
         for eth_board_info, data in chip_data.items():
@@ -415,6 +415,55 @@ class TopoBackend:
 
         self.log.connection_map = log_connection_map
         return chip_data
+
+    def check_num_available_connections(self, chip_data) -> int:
+        """
+        Given a connection map, check whether
+        the total number of connections available to the chips
+        matches the expected number of connections, using this formula:
+
+        (total connections) = 1/2 * ((3 * total chips) - 4)
+
+        Assuming an even number of chips in a 2 by X configuration, if the
+        total number of connections is less than expected, we know something is
+        wrong, like a missing cable, and we can warn the user. There are definitely
+        more correct or flexible ways of checking the graph that involve search, but
+        this is fast and easy and will warn us about most kinds of common issues.
+
+        For instance, in a 4x(WHx2) configuration, we expect the following available connections:
+
+        R -- L -- L -- R
+        |    |    |    |
+        R -- L -- L -- R
+
+        8 chips, 10 connections.
+
+        Returns: Number of connections missing, if any, else 0
+        """
+
+        # Get a set of unique connections
+        connections = set()
+        for k, v in chip_data.items():
+            chip_id = v['id']
+            # Get a list of the IDs this chips is connected to
+            connected_idxs = [x[0] for x in v['connections']]
+            for idx in connected_idxs:
+                # Sort tuple to ensure uniqueness; (1, 3) and (3, 1) are the same
+                connection_tuple = tuple(sorted((chip_id, idx)))
+                connections.add(connection_tuple)
+
+        total_connections = len(connections)
+        num_chips = len(chip_data)
+
+        expected_connections = ((3 * num_chips) - 4) // 2
+
+        if total_connections > expected_connections:
+            print(
+                CMD_LINE_COLOR.RED,
+                "Warning: Too many connections. Physical configuration may be unsupported.",
+                CMD_LINE_COLOR.ENDC,
+            )
+        return max(0, expected_connections - total_connections)
 
     def generate_coordinates_mesh(self, chip_data):
         """
