@@ -227,11 +227,17 @@ class TopoBackend:
                 int(constants.ETH_PARAM_CHIP_COORD),
                 int(0x0).to_bytes(4, byteorder="little"),
             )
-            wh_chip.spi_write(
-                int(constants.ETH_PARAM_PORT_DISABLE),
-                int(0x0).to_bytes(4, byteorder="little")
-                # bytearray([0xFF, 0xFC, 0x00, 0x00]),
-            )
+            # If in isolated mode, set ethernet port to disabled
+            if self.layout == "isolated":
+                wh_chip.spi_write(
+                    int(constants.ETH_PARAM_PORT_DISABLE),
+                    bytearray([0xFF, 0xFC, 0x00, 0x00]),
+                )
+            else:
+                wh_chip.spi_write(
+                    int(constants.ETH_PARAM_PORT_DISABLE),
+                    int(0x0).to_bytes(4, byteorder="little"),
+                )
             wh_chip.spi_write(
                 int(constants.ETH_PARAM_RACK_SHELF),
                 int(0x0).to_bytes(4, byteorder="little")
@@ -255,14 +261,23 @@ class TopoBackend:
                     ),
                     chip_coord_r,
                 )
-                wh_chip.spi_write(
-                    int(
-                        constants.ETH_PARAM_PORT_DISABLE
-                        + constants.ETH_PARAM_RIGHT_OFFSET
-                    ),
-                    int(0x0).to_bytes(4, byteorder="little")
-                    # bytearray([0xFC, 0xFF, 0x0, 0x0]),
-                )
+                # If in isolated mode, set ethernet port to disabled
+                if self.layout == "isolated":
+                    wh_chip.spi_write(
+                        int(
+                            constants.ETH_PARAM_PORT_DISABLE
+                            + constants.ETH_PARAM_RIGHT_OFFSET
+                        ),
+                        bytearray([0xFC, 0xFF, 0x0, 0x0]),
+                    )
+                else:
+                    wh_chip.spi_write(
+                        int(
+                            constants.ETH_PARAM_PORT_DISABLE
+                            + constants.ETH_PARAM_RIGHT_OFFSET
+                        ),
+                        int(0x0).to_bytes(4, byteorder="little"),
+                    )
                 wh_chip.spi_write(
                     int(
                         constants.ETH_PARAM_RACK_SHELF
