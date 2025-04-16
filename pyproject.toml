@@ -1,6 +1,6 @@
 [project]
 name = "tt-topology"
-version = "1.2.4"
+version = "1.2.5"
 description = "ethernet topology configuration tool for Tenstorrent silicon"
 readme = "README.md"
 requires-python = ">=3.7"
