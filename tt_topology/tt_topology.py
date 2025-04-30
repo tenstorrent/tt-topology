@@ -396,6 +396,9 @@ def main():
     """
     First entry point for TT-Topo. Detects devices and instantiates backend.
     """
+    parser = parse_args()
+    args = parser.parse_args()
+
     driver = get_driver_version()
     if not driver:
         print(
@@ -405,8 +408,6 @@ def main():
         )
         sys.exit(1)
 
-    parser = parse_args()
-    args = parser.parse_args()
     if not len(sys.argv) > 1:
         # No arguments have been provided - print help and exit
         print(
