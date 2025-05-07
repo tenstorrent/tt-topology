@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Use tools-common 1.4.15
 - Use type checking in octopus reset
-
+- Bug fix: added "ignore-eth" flag to first chip detect to avoid eth training loops forever and truly detect pcie only chips
+- Chore: bumped luwen
 
 ## 1.2.5 - 15/04/2025
 
