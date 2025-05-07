@@ -23,6 +23,7 @@ from tt_tools_common.utils_common.tools_utils import (
 from tt_tools_common.reset_common.reset_utils import (
     generate_reset_logs,
     parse_reset_input,
+    ResetType,
 )
 from tt_topology.backend import (
     TopoBackend,
@@ -104,10 +105,10 @@ def parse_args():
     parser.add_argument(
         "-r",
         "--reset",
-        type=parse_reset_input,
-        metavar="0,1 ... or config.json",
+        metavar="config.json",
         default=None,
-        help=("Provide a list of mobos and their credos to reset."),
+        nargs="*",
+        help=("Provide a valid reset JSON"),
         dest="reset",
     )
 
@@ -476,7 +477,15 @@ def main():
 
     if args.octopus:
         if args.reset is not None:
-            mobo_dict_list = args.reset
+            reset_input = parse_reset_input(args.reset)
+            if reset_input.type is not ResetType.CONFIG_JSON:
+                e = "Invalid reset input: Please provide only a valid Reset JSON file"
+                print(
+                    CMD_LINE_COLOR.RED,
+                    e,
+                    CMD_LINE_COLOR.ENDC,
+                )
+                sys.exit(1)
         else:
             e = "Please provide a reset json file for octopus"
             print(
@@ -485,7 +494,8 @@ def main():
                 CMD_LINE_COLOR.ENDC,
             )
             sys.exit(1)
-        topo_backend_octo = TopoBackend_Octopus(devices, mobo_dict_list)
+
+        topo_backend_octo = TopoBackend_Octopus(devices, reset_input.value)
         program_galaxy(topo_backend_octo)
         sys.exit()
 
