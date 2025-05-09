@@ -151,7 +151,7 @@ def run_and_flash(topo_backend: TopoBackend):
     # Reset all pci devices
     num_local_chips = len(topo_backend.devices)
     reset_obj = WHChipReset()
-    pci_interfaces = list(range(num_local_chips))
+    pci_interfaces = [dev.get_pci_interface_id() for dev in topo_backend.devices]
     print(
         CMD_LINE_COLOR.BLUE,
         f"Initiating reset on chips at pcie interface: {pci_interfaces}",
@@ -255,7 +255,6 @@ def run_and_flash(topo_backend: TopoBackend):
         CMD_LINE_COLOR.ENDC,
     )
 
-    pci_interfaces = list(range(num_local_chips))
     print(
         CMD_LINE_COLOR.BLUE,
         f"Initiating reset on chips at pcie interface: {pci_interfaces}",

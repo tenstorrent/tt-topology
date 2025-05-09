@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.2.8 - 08/05/2025
+
+### Updated
+
+- Fixed issue where tool would fail when PCI interfaces don't start from ID 0
+- Now using actual PCI interface IDs from devices instead of assuming sequential numbering
+
 ## 1.2.7 - 07/05/2025
 
 ### Updated
