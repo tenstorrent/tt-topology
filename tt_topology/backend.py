@@ -22,7 +22,7 @@ from tt_tools_common.reset_common.galaxy_reset import GalaxyReset
 from tt_topology import log
 
 LOG_FOLDER = os.path.expanduser("~/tt_topology_logs/")
-
+ORANGE = "\033[38;5;208m"
 
 def detect_current_topology(devices: List[PciChip]):
     """
@@ -571,26 +571,39 @@ class TopoBackend:
             data["id"]: [index[0] for index in data["connections"]]
             for data in chip_data.values()
         }
-        # Create a directed graph
-        G = nx.DiGraph(adjacency_map)
+        G = nx.Graph(adjacency_map)
         # Generate a list of cycles
         try:
-            has_cycle = nx.simple_cycles(G)
+            cycle_list = nx.simple_cycles(G)
         except Exception as e:
             print(
                 CMD_LINE_COLOR.RED,
-                "There is no torus or linear connection possible with this layout!",
+                "No cycles detected!",
                 e,
                 CMD_LINE_COLOR.ENDC,
             )
 
         torus_cycle = []
-        for i in has_cycle:
+
+        for i in cycle_list:
             if len(i) == len(G.nodes):
                 # Take the first viable cycle
                 torus_cycle = i
                 break
-
+        if torus_cycle == []:
+            print(
+                ORANGE,
+                "Warning: No cycle detected - cannot do a torus layout, going to try longest simple path instead for linear layout.",
+                CMD_LINE_COLOR.ENDC,
+            )
+            torus_cycle = self.find_longest_simple_path(adjacency_map)
+            if len(torus_cycle) == 0:
+                print(
+                    CMD_LINE_COLOR.RED,
+                    "No viable linear path found either, exiting!",
+                    CMD_LINE_COLOR.ENDC,
+                )
+                sys.exit(1)
         final_coord_map = {}
         #  Since x/y coordinates are the same for both torus and linear, we can just assign x = 0
         for idx, node in enumerate(torus_cycle):
@@ -599,6 +612,53 @@ class TopoBackend:
         self.log.coordinate_map = final_coord_map
 
         return final_coord_map
+
+    def find_longest_simple_path(self, adj_list):
+        """
+        Given an adj_list, find the longest simple path using DFS. For linear layouts that don't have a cycle.
+
+        Returns:
+            List of nodes in order of the longest simple path found.
+        """
+
+        G = nx.Graph()
+        for node, neighbors in adj_list.items():
+            for neighbor in neighbors:
+                G.add_edge(node, neighbor)
+
+        # DFS to find the longest simple path
+        def dfs(node, visited, path):
+            nonlocal max_path
+            visited.add(node)
+            path.append(node)
+
+            # Update max_path if current path is longer
+            if len(path) > len(max_path):
+                max_path = list(path)
+
+            # Explore neighbors
+            for neighbor in G.neighbors(node):
+                if neighbor not in visited:
+                    dfs(neighbor, visited, path)
+
+            # Backtrack
+            path.pop()
+            visited.remove(node)
+
+        # Try DFS from each node - store max_path found so far
+        max_path = []
+        nodes = list(G.nodes())
+
+        for start_node in nodes:
+            dfs(start_node, set(), [])
+
+        print(
+            CMD_LINE_COLOR.YELLOW,
+            "Longest simple path:",
+            max_path,
+            CMD_LINE_COLOR.ENDC,
+        )
+        return max_path
 
     def flash_to_specified_state(self, chip_data, coord_map):
         """Given the chips and the coordinates assigned to them, flash the boards with the correct port disables anc coordinates"""

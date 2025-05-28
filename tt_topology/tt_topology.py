@@ -29,6 +29,7 @@ from tt_topology.backend import (
     TopoBackend,
     TopoBackend_Octopus,
     detect_current_topology,
+    ORANGE,
 )
 
 
@@ -201,8 +202,8 @@ def run_and_flash(topo_backend: TopoBackend):
 
     if num_connections_missing:
         print(
-            CMD_LINE_COLOR.RED,
-            f"Detected {num_connections_missing} missing physical connection(s)! It's possible cables are loose or missing.",
+            ORANGE,
+            f"Warning: Detected {num_connections_missing} missing physical connection(s) for mesh layout! It's possible cables are loose or missing.",
             CMD_LINE_COLOR.ENDC,
         )
 
