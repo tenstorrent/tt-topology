@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.2.9 - 30/05/2025
+
+### Updated
+
+- Bug fix for https://github.com/tenstorrent/tt-topology/issues/39. Now the tool will use a DFS longest path to determine a linear layout if its not a fully connected graph.
+- Updated initial device detection - now it needs full noc access for octopus and list options
+
 ## 1.2.8 - 08/05/2025
 
 ### Updated
