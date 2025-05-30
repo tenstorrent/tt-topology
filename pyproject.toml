@@ -32,7 +32,7 @@ dependencies = [
   'pre-commit==3.5.0',
   'networkx==3.1',
   'matplotlib==3.7.4',
-  'setuptools==75.3.0',
+  'setuptools==78.1.1',
 ]
 
 [project.urls]
