@@ -420,7 +420,12 @@ def main():
     local_only = not args.list
 
     try:
-        devices = detect_chips_with_callback(local_only=local_only, ignore_ethernet=True)
+        if args.list or args.octopus:
+            # We need eth of these options to have full noc access
+            devices = detect_chips_with_callback(local_only=local_only, ignore_ethernet=False)
+        else:
+            # Only ignore eth for pcie chip flash
+            devices = detect_chips_with_callback(local_only=local_only, ignore_ethernet=True)
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
