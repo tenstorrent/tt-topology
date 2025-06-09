@@ -201,11 +201,19 @@ def run_and_flash(topo_backend: TopoBackend):
     )
 
     if num_connections_missing:
-        print(
-            ORANGE,
-            f"Warning: Detected {num_connections_missing} missing physical connection(s) for mesh layout! It's possible cables are loose or missing.",
+        if topo_backend.layout == "mesh":
+            print(
+            CMD_LINE_COLOR.RED,
+            f"Error: Detected {num_connections_missing} missing physical connection(s) for mesh layout! It's possible cables are loose or missing.",
             CMD_LINE_COLOR.ENDC,
-        )
+            )
+            sys.exit(1)
+        else:
+            print(
+                ORANGE,
+                f"Warning: Detected {num_connections_missing} missing physical connection(s) for mesh layout! It's possible cables are loose or missing.",
+                CMD_LINE_COLOR.ENDC,
+            )
 
     print(
         CMD_LINE_COLOR.BLUE,
