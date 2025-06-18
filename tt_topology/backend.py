@@ -480,6 +480,101 @@ class TopoBackend:
             )
         return max(0, expected_connections - total_connections)
 
+    def convert_connections_to_map(self, connection_map):
+        """
+        Convert the connection map to a type agnostic adj map
+        Input example:
+        0  :  [(3, 'X'), (4, 'X'), (1, 'T')]
+        1  :  [(2, 'X'), (5, 'X'), (0, 'T')]
+        2  :  [(1, 'X'), (6, 'X'), (3, 'T')]
+        3  :  [(0, 'X'), (7, 'X'), (2, 'T')]
+        4  :  [(0, 'X'), (5, 'T')]
+        5  :  [(1, 'X'), (4, 'T')]
+        6  :  [(2, 'X'), (7, 'T')]
+        7  :  [(3, 'X'), (6, 'T')]
+        Output:
+        0: [3, 4, 1],
+        1: [2, 5, 0],
+        2: [1, 6, 3],
+        3: [0, 7, 2],
+        4: [0, 5],
+        5: [1, 4],
+        6: [2, 7],
+        7: [3, 6]
+        """
+        adj_map = {}
+        for chip_id, connections in connection_map.items():
+            adj_map[chip_id] = []
+            for conn in connections:
+                # Add the connected chip ID to the adjacency map
+                adj_map[chip_id].append(conn[0])
+        return adj_map
+
+    def generate_mesh_connection_independent(self, chip_data):
+        """
+        Given coordinates for a fully connected mesh using BFS
+        Rules:
+            1. Start with the first node that has 2 connections and make it (0,0)
+            2. Any connection type is valid and can be used to generate coordinates
+            3. Check compliance of candidate coordinates with neighbouring nodes.
+                a. Candidate coordinates must not be already assigned to another node
+                b. Candidate coordinates cannot be negative
+                c. Candidate coordinates must be ± 1 in X or Y direction from all its neighbours
+        """
+        directions = [(1, 0), (0, 1), (-1, 0), (0, -1)]  # Right, Up, Left, Down
+        connection_map = {data["id"]: data["connections"] for data in chip_data.values()}
+        adjacency_map = self.convert_connections_to_map(connection_map)
+        for node in adjacency_map:
+            if len(adjacency_map[node]) == 2:
+                start_node = node
+                break
+        coordinates = {start_node: (0, 0)}
+        visited = {start_node}
+        queue = deque([start_node])
+
+        # BFS
+        while queue:
+            u = queue.popleft()
+            for v in adjacency_map[u]:
+                if v not in visited:
+                    for dx, dy in directions:
+                        candidate_coord = (coordinates[u][0] + dx, coordinates[u][1] + dy)
+                        compliant = True  # Assume the candidate coordinates are compliant
+                        # Check if the candidate coord is already assigned to another node
+                        if candidate_coord in coordinates.values():
+                            compliant = False
+                            continue
+                        # Check if the candidate coord is compliant with all its neighbours
+                        for neighbor in adjacency_map[v]:
+                            # If the neighbor has coordinates assigned, check consistency
+                            if neighbor in coordinates:
+                                nx, ny = coordinates[neighbor]
+                                if not ((abs(nx - candidate_coord[0]) == 1 and ny == candidate_coord[1]) or \
+                                        (abs(ny - candidate_coord[1]) == 1 and nx == candidate_coord[0])):
+                                    compliant = False
+                                    break
+                        # Ensure coordinates never go into the negative
+                        if candidate_coord[0] < 0 or candidate_coord[1] < 0:
+                            compliant = False
+
+                        # We found a suitable candidate coordinate
+                        if compliant:
+                            coordinates[v] = candidate_coord
+                            visited.add(v)
+                            queue.append(v)
+                            break
+                    else:
+                        # If we exit the for loop without breaking, it means we couldn't find a compliant coordinate
+                        print(
+                        CMD_LINE_COLOR.RED,
+                        f"Could not assign compliant coordinates to node {v} from node {u} with candidate {candidate_coord}",
+                        "Not a true mesh, exiting to avoid flashing wrong coords....",
+                        CMD_LINE_COLOR.ENDC,
+                        sys.exit(1)
+                    )
+        self.log.coordinate_map = coordinates
+        return coordinates
+
     def generate_coordinates_mesh(self, chip_data):
         """
         Generate coordinates for a fully connected topology using breadth first search

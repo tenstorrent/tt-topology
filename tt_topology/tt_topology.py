@@ -234,7 +234,7 @@ def run_and_flash(topo_backend: TopoBackend):
             connection_data
         )
     elif topo_backend.layout == "mesh":
-        coordinates_map = topo_backend.generate_coordinates_mesh(connection_data)
+        coordinates_map = topo_backend.generate_mesh_connection_independent(connection_data)
     else:
         print(
             CMD_LINE_COLOR.RED,
