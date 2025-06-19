@@ -201,11 +201,19 @@ def run_and_flash(topo_backend: TopoBackend):
     )
 
     if num_connections_missing:
-        print(
-            ORANGE,
-            f"Warning: Detected {num_connections_missing} missing physical connection(s) for mesh layout! It's possible cables are loose or missing.",
+        if topo_backend.layout == "mesh":
+            print(
+            CMD_LINE_COLOR.RED,
+            f"Error: Detected {num_connections_missing} missing physical connection(s) for mesh layout! It's possible cables are loose or missing.",
             CMD_LINE_COLOR.ENDC,
-        )
+            )
+            sys.exit(1)
+        else:
+            print(
+                ORANGE,
+                f"Warning: Detected {num_connections_missing} missing physical connection(s) for mesh layout! It's possible cables are loose or missing.",
+                CMD_LINE_COLOR.ENDC,
+            )
 
     print(
         CMD_LINE_COLOR.BLUE,
@@ -226,7 +234,7 @@ def run_and_flash(topo_backend: TopoBackend):
             connection_data
         )
     elif topo_backend.layout == "mesh":
-        coordinates_map = topo_backend.generate_coordinates_mesh(connection_data)
+        coordinates_map = topo_backend.generate_mesh_connection_independent(connection_data)
     else:
         print(
             CMD_LINE_COLOR.RED,
@@ -454,8 +462,8 @@ def main():
     # Notify the user; empty lists are falsy
     if unsupported_device_names:
         print(
-            CMD_LINE_COLOR.YELLOW,
-            f"TT-Topology will only run on n300/n150/GALAXY boards.\n Ignoring these devices: {', '.join(unsupported_device_names)}.",
+            ORANGE,
+            f"TT-Topology will only run on n300/n150/GALAXY(WH 4U only) boards.\n Ignoring these devices: {', '.join(unsupported_device_names)}.",
             CMD_LINE_COLOR.ENDC,
         )
     # Proceed with only supported devices

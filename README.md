@@ -9,6 +9,13 @@ It curretly supports three configurtions - mesh, linear and torus
 
 [https://github.com/tenstorrent/tt-topology/](https://github.com/tenstorrent/tt-topology/)
 
+# Warning
+tt-topology is not applicable on the following:
+- BH pcie cards
+- WH 6U Galaxy systems
+- BH 6U Galaxy systems
+The tool will error out if used with unsupported baords
+
 # Getting started
 Build and editing instruction are as follows -
 
@@ -32,8 +39,10 @@ source .venv/bin/activate
 ```
 ## Required
 
-Install tt-topology.
+Install tt-topology - clone the repo, enter the folder and pip install
 ```
+git clone https://github.com/tenstorrent/tt-topology.git
+cd tt-topology
 pip3 install --upgrade pip
 pip3 install .
 ```
@@ -61,27 +70,26 @@ pre-commit install
 
 Command line arguments
 ```
-usage: tt-topology [-h] [-v] [-l {linear,torus,mesh}] [-ls] [--log [log]] [-p [plot]]
+usage: tt-topology [-h] [-v] [-l {linear,torus,mesh,isolated}] [-o] [-f [filename]] [-g] [-ls] [--log [log]] [-p [plot]] [-r [config.json ...]]
 
 Tenstorrent Topology (TT-Topology) is a command line utility to flash ethernet coordinates when multiple NB's are connected together.
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -v, --version         show program's version number and exit
-  -l {linear,torus,mesh}, --layout {linear,torus,mesh}
-                        Select the layout (linear, torus, mesh). Default is linear.
+  -l {linear,torus,mesh,isolated}, --layout {linear,torus,mesh,isolated}
+                        Select the layout (linear, torus, mesh, isolated). Default is linear.
+  -o, --octopus
+  -f [filename], --filename [filename]
+                        Change filename for test log. Default: ~/tt_smi/<timestamp>_snapshot.json
+  -g, --generate_reset_json
+                        Generate default reset json file that reset consumes. Update the generated file and use it as an input for the --reset option
   -ls, --list           List out all the boards on host with their coordinates and layout.
-  --log [log]           Change filename for the topology flash log. Default:
-                        ~/tt_topology_logs/<timestamp>_log.json
+  --log [log]           Change filename for the topology flash log. Default: ~/tt_topology_logs/<timestamp>_log.json
   -p [plot], --plot_filename [plot]
-                        Change the plot of the png that will have the graph layout of the chips. Default:
-                        chip_layout.png
-  -o, --octopus         octopus support in galaxy
-  -g [GENERATE_RESET_JSON], --generate_reset_json [GENERATE_RESET_JSON]
-                        Generate default reset json file that reset consumes. Default stored at ~/.config/tenstorrent/reset_config.json. Update the generated file and use it as an
-                        input for the --reset option
-  -r config.json, --reset config.json
-                        Provide a json file with reset configs. Generate a default reset json file with the -g option.
+                        Change the plot of the png that will have the graph layout of the chips. Default: chip_layout.png
+  -r [config.json ...], --reset [config.json ...]
+                        Provide a valid reset JSON
 
 ```
 # TT-Topology Procedure
