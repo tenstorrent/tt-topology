@@ -68,7 +68,7 @@ def main():
             local_devs.append(device)
 
     port_disable_l = generate_port_disble_mask(
-        disable_qsfp=True, disable_tfly=False, is_remote=False
+        disable_qsfp=False, disable_tfly=False, is_remote=False
     )
     port_disable_r = generate_port_disble_mask(
         disable_qsfp=False, disable_tfly=False, is_remote=True
@@ -76,9 +76,6 @@ def main():
     flash_to_coords(local_devs[0], 1, 0, 0, 0, port_disable_l, port_disable_r)
     flash_to_coords(local_devs[1], 1, 1, 0, 1, port_disable_l, port_disable_r)
 
-    hello = generate_port_disble_mask(
-        disable_qsfp=True, disable_tfly=False, is_remote=False)
-    print(f"Port disable mask:  0x{hello:04x}")
     # Perform LtoR copies for nebula x2 left chips
     for i, device in enumerate(devices):
         if not device.is_remote():
