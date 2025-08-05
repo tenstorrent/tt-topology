@@ -1,0 +1,36 @@
+Source: tt-topology
+Section: utils
+Priority: optional
+Maintainer: Sam Bansal <sbansal@tenstorrent.com>
+Build-depends:
+ debhelper (>= 10),
+ dh-python,
+ pybuild-plugin-pyproject,
+ python3,
+ python3-setuptools,
+ python3-wheel,
+ python3-all,
+ python3-pip
+Standards-Version: 4.5.0
+Homepage: https://github.com/tenstorrent/tt-topology
+Vcs-Git: https://github.com/tenstorrent/tt-topology.git
+Vcs-Browser: https://github.com/tenstorrent/tt-topology
+
+Package: tt-topology
+Architecture: all
+Essential: no
+Depends:
+ ${misc:Depends},
+ ${python3:Depends},
+ python3-pyluwen,
+Description: Tenstorrent Firmware Flash tool
+ # tt-topology
+ .
+ Tenstorrent Topology (TT-Topology) is a command line utility
+ used to flash multiple NB cards on a system to use specific eth routing configurations.
+ .
+ It curretly supports three configurtions - mesh, linear and torus
+ .
+ ## Official Repository
+ [https://github.com/tenstorrent/tt-topology](https://github.com/tenstorrent/tt-topology)
+
