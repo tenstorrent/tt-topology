@@ -1,3 +1,16 @@
+tt-topology (1.2.13) noble; urgency=medium
+
+  [ John 'Warthog9' Hawley ]
+  * pyproject.toml: Minor typo fix
+  * Fixing build process
+  * Chasing down that signing problem
+  * build-debian: Fixing number of commits counter
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 1.2.13
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Mon, 18 Aug 2025 23:07:14 +0000
+
 tt-topology (1.2.12) noble; urgency=medium
 
   [ John 'Warthog9' Hawley ]
