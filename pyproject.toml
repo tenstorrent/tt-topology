@@ -24,15 +24,16 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
 ]
 dependencies = [
-  'tt_tools_common>=1.4.19',
-  'pyluwen>=0.7.9',
   'black==24.3.0',
   'elasticsearch==8.11.0',
-  'pydantic>=1.2',
-  'pre-commit==3.5.0',
-  'networkx==3.1',
   'matplotlib==3.7.4',
+  'networkx==3.1',
+  'pre-commit==3.5.0',
+  'pydantic>=1.2',
+  'pyluwen>=0.7.9',
   'setuptools==78.1.1',
+  "tomli == 2.0.1; python_version < '3.11'",
+  'tt_tools_common>=1.4.19',
 ]
 
 [project.urls]
@@ -55,6 +56,7 @@ include-package-data = true
 [tool.setuptools.exclude-package-data]
 "*" = [
   'build',
+  'debian',
 ]
 
 [tool.setuptools.packages.find]
