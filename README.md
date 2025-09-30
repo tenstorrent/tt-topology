@@ -12,9 +12,9 @@ It curretly supports three configurtions - mesh, linear and torus
 # Warning
 tt-topology is not applicable on the following:
 - BH pcie cards
-- WH 6U Galaxy systems
-- BH 6U Galaxy systems
-The tool will error out if used with unsupported baords
+The tool will error out if used with unsupported boards
+
+For WH 6U galaxy systems, you can perform tray level isolation with the `--ubb_isolation` command line arg
 
 # Getting started
 Build and editing instruction are as follows -
@@ -90,6 +90,8 @@ options:
                         Change the plot of the png that will have the graph layout of the chips. Default: chip_layout.png
   -r [config.json ...], --reset [config.json ...]
                         Provide a valid reset JSON
+  --ubb_isolation {1,2,3,4}
+                        Eth isolate a specific UBB (1-4) from the rest of the system
 
 ```
 # TT-Topology Procedure
