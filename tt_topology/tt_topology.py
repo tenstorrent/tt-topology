@@ -112,7 +112,14 @@ def parse_args():
         help=("Provide a valid reset JSON"),
         dest="reset",
     )
-
+    parser.add_argument(
+        "--ubb_isolation",
+        default=None,
+        choices=[1,2,3,4],
+        help="Eth isolate a specific UBB (1-4) from the rest of the system",
+        type=int,
+        dest="ubb_isolation",
+    )
     return parser
 
 
@@ -449,6 +456,21 @@ def main():
         )
         sys.exit(1)
 
+    if args.ubb_isolation is not None:
+        from tt_topology.ubb_topo.ubb_topology import (
+            get_ubb_device_map,
+            isolate_ubb,
+        )
+        ubb_device_map = get_ubb_device_map(devices)
+        isolate_ubb(args.ubb_isolation, ubb_device_map)
+
+        print(
+            CMD_LINE_COLOR.YELLOW,
+            f"Please reset the system with tt-smi -glx_reset to apply UBB isolation",
+            CMD_LINE_COLOR.ENDC,
+        )
+
+        sys.exit(0)
     # Warn the user if any board is not in the accepted boards list
     supported_devices = []
     unsupported_device_names = []
