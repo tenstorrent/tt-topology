@@ -24,7 +24,7 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
 ]
 dependencies = [
-  'tt_tools_common>=1.4.19',
+  'tt_tools_common @ git+https://github.com/tenstorrent/tt-tools-common.git@sbansal/xen_reset_updates',
   'pyluwen>=0.7.9',
   'black>=24.3.0',
   'elasticsearch>=8.11.0',
