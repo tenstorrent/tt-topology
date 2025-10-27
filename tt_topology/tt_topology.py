@@ -10,7 +10,7 @@ import sys
 import time
 import argparse
 import traceback
-import pkg_resources
+from importlib.metadata import version
 from tt_tools_common.reset_common.wh_reset import WHChipReset
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.utils_common.system_utils import (
@@ -41,7 +41,7 @@ def parse_args():
         "-v",
         "--version",
         action="version",
-        version=pkg_resources.get_distribution("tt_topology").version,
+        version=version("tt_topology"),
     )
     parser.add_argument(
         "-l",
