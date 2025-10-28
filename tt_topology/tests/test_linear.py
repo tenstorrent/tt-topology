@@ -7,7 +7,7 @@ import networkx as nx
 os.environ["MPLCONFIGDIR"] = os.getcwd() + "/configs/"
 import matplotlib.pyplot as plt
 
-graph: {
+graph = {
     0: [3, 4, 1],
     1: [2, 5, 0],
     2: [1, 6, 3],
