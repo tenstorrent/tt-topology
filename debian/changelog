@@ -1,3 +1,23 @@
+tt-topology (1.2.14) noble; urgency=medium
+
+  [ Tristan Ross ]
+  * chore: loosen dependency requirements
+
+  [ Samridhi Bansal ]
+  * Add multi host enablement for n300 by default
+
+  [ Jonathan Baker ]
+  * Point to v2 community tagging script
+
+  [ Petra Alexson ]
+  * Clean up dependencies in pyproject.toml
+  * Separate flash_n300_multihost into its own step
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 1.2.14
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Wed, 29 Oct 2025 19:39:38 +0000
+
 tt-topology (1.2.13) noble; urgency=medium
 
   [ John 'Warthog9' Hawley ]
