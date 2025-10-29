@@ -1009,9 +1009,6 @@ class TopoBackend:
                     f"Completed coord flash for board {board_id}",
                     CMD_LINE_COLOR.ENDC,
                 )
-        # For the n300 enable multi-host mode by default.
-        # Check for 8 n300 chips happens in the function
-        self.flash_n300_multihost(chip_data, coord_map)
 
     def graph_visualization(self, chip_data, coordinates):
         """

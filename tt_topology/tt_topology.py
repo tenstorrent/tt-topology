@@ -278,6 +278,35 @@ def run_and_flash(topo_backend: TopoBackend):
     )
     print()
 
+    # Update connection_data with new backend devices
+    connection_data = topo_backend.generate_connection_map()
+
+    # For the n300 enable multi-host mode by default.
+    # Check for 8 n300 chips happens in the function
+    topo_backend.flash_n300_multihost(connection_data, coordinates_map)
+
+    # TODO: I'm not sure what the purpose of the 15s sleep is after the other steps,
+    # so please adjust accordingly if we need to wait longer after this step.
+    print(
+        CMD_LINE_COLOR.PURPLE,
+        "Sleeping for 5s ...",
+        CMD_LINE_COLOR.ENDC,
+    )
+    time.sleep(5)
+    print(
+        CMD_LINE_COLOR.BLUE,
+        f"Initiating reset on chips at pcie interface: {pci_interfaces}",
+        CMD_LINE_COLOR.ENDC,
+    )
+    reset_devices = reset_obj.full_lds_reset(pci_interfaces)
+    topo_backend.devices = detect_chips_with_callback()
+    print(
+        CMD_LINE_COLOR.BLUE,
+        f"Completed reset on {len(topo_backend.devices)} chips",
+        CMD_LINE_COLOR.ENDC,
+    )
+    print()
+
     # Get the final eth config state
     topo_backend.get_eth_config_state()
 
