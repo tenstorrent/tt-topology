@@ -755,6 +755,113 @@ class TopoBackend:
         )
         return max_path
 
+    def flash_n300_multihost(self, chip_data, coord_map):
+        """
+        Flash n300 boards in a multi-host configuration.
+        Will only be applied if there are 4 n300 boards aka 8 WH n300 chips.
+        """
+        # We need 8 chips and all of type n300
+        n300_chips = [data for data in chip_data.values() if data["board_type"] == "n300"]
+        if len(n300_chips) != 8 or self.layout != "mesh":
+            # Not a multi-host n300 configuration
+            return
+        else:
+            print(
+                CMD_LINE_COLOR.YELLOW,
+                "Detected 8 n300 boards, applying multi-host n300 flashing procedure",
+                CMD_LINE_COLOR.ENDC,
+            )
+            # Apply the multi-host n300 flashing procedure
+            # coords 1,0 and 2,0 are flashed the same
+            # coords 1,1 and 2,1 are flashed the same
+
+            for cid, coord in coord_map.items():
+                if coord == (1, 0) or coord == (2, 0):
+                    for _, data in chip_data.items():
+                        if data["id"] == cid:
+                            curr_flash_data = data
+                            break
+                    chip_to_flash = curr_flash_data["chip_obj"]
+                    # flash eth coordinate check disable.
+                    chip_to_flash.as_wh().spi_write(
+                        int(constants.ETH_COORD_CHECK_DISABLE),
+                        int(0x0).to_bytes(4, byteorder="little"),
+                    )
+                    # flash eth routing disable left.
+                    chip_to_flash.as_wh().spi_write(
+                        int(constants.ETH_ROUTING_DISABLE_L),
+                        int(0xC002).to_bytes(4, byteorder="little"),
+                    )
+                    # flash eth routing disable right.
+                    chip_to_flash.as_wh().spi_write(
+                        int(constants.ETH_ROUTING_DISABLE_R),
+                        int(0x02).to_bytes(4, byteorder="little"),
+                    )
+                    # L2R copy
+                    try:
+                        chip_to_flash.as_wh().arc_msg(
+                            init_fw_defines("wormhole", "tt_topology")[
+                                "MSG_TRIGGER_SPI_COPY_LtoR"
+                            ],
+                            wait_for_done=True,
+                            arg0=0,
+                            arg1=0,
+                            timeout=5,
+                        )
+                    except Exception as e:
+                        print(
+                            CMD_LINE_COLOR.RED,
+                            "Failed to trigger L2R copy on chip:",
+                            curr_flash_data,
+                            CMD_LINE_COLOR.ENDC,
+                        )
+
+                elif coord == (1, 1) or coord == (2, 1):
+                    for _, data in chip_data.items():
+                        if data["id"] == cid:
+                            curr_flash_data = data
+                            break
+                    chip_to_flash = curr_flash_data["chip_obj"]
+                    # flash eth coordinate check disable.
+                    chip_to_flash.as_wh().spi_write(
+                        int(constants.ETH_COORD_CHECK_DISABLE),
+                        int(0x0).to_bytes(4, byteorder="little"),
+                    )
+                    # flash eth routing disable left.
+                    chip_to_flash.as_wh().spi_write(
+                        int(constants.ETH_ROUTING_DISABLE_L),
+                        int(0x302).to_bytes(4, byteorder="little"),
+                    )
+                    # flash eth routing disable right.
+                    chip_to_flash.as_wh().spi_write(
+                        int(constants.ETH_ROUTING_DISABLE_R),
+                        int(0x02).to_bytes(4, byteorder="little"),
+                    )
+                    # L2R copy
+                    try:
+                        chip_to_flash.as_wh().arc_msg(
+                            init_fw_defines("wormhole", "tt_topology")[
+                                "MSG_TRIGGER_SPI_COPY_LtoR"
+                            ],
+                            wait_for_done=True,
+                            arg0=0,
+                            arg1=0,
+                            timeout=5,
+                        )
+                    except Exception as e:
+                        print(
+                            CMD_LINE_COLOR.RED,
+                            "Failed to trigger L2R copy on chip:",
+                            curr_flash_data,
+                            CMD_LINE_COLOR.ENDC,
+                        )
+            print(
+                CMD_LINE_COLOR.BLUE,
+                "Completed multi-host n300 setup",
+                CMD_LINE_COLOR.ENDC,
+            )
+        return
+
     def flash_to_specified_state(self, chip_data, coord_map):
         """Given the chips and the coordinates assigned to them, flash the boards with the correct port disables anc coordinates"""
         connection_type = self.layout
