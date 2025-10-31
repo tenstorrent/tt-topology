@@ -488,13 +488,22 @@ def main():
             supported_devices.append(dev)
         else:
             unsupported_device_names.append(board_type)
+
     # Notify the user; empty lists are falsy
     if unsupported_device_names:
         print(
             ORANGE,
-            f"TT-Topology will only run on n300/n150/GALAXY(WH 4U only) boards.\n Ignoring these devices: {', '.join(unsupported_device_names)}.",
+            f"TT-Topology will only run on n300/n150/GALAXY(WH 4U only) boards.\n",
+            f"Ignoring these devices: {', '.join(unsupported_device_names)}.",
             CMD_LINE_COLOR.ENDC,
         )
+        if not supported_devices:
+            print(
+                CMD_LINE_COLOR.RED,
+                "No devices supported by TT-Topology detected. Exiting...",
+                CMD_LINE_COLOR.ENDC,
+            )
+            sys.exit(1)
     # Proceed with only supported devices
     devices = supported_devices
 
