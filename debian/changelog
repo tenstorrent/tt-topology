@@ -1,3 +1,17 @@
+tt-topology (1.2.15) noble; urgency=medium
+
+  [ Petra Alexson ]
+  * Exit if no supported devices are detected
+  * fix typo in test_linear
+
+  [ Samridhi Bansal ]
+  * Bumped tools-common version to accomodate xen reset schema
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 1.2.15
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Tue, 04 Nov 2025 15:57:49 +0000
+
 tt-topology (1.2.14) noble; urgency=medium
 
   [ Tristan Ross ]
