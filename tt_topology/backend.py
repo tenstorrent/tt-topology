@@ -5,7 +5,7 @@ import sys
 import datetime
 from pathlib import Path
 import networkx as nx
-from typing import List
+from typing import Any, Dict, List, Optional
 from pyluwen import PciChip
 from collections import deque
 import matplotlib.pyplot as plt
@@ -19,12 +19,19 @@ from tt_tools_common.utils_common.tools_utils import (
 )
 from tt_tools_common.utils_common.system_utils import get_host_info
 from tt_tools_common.reset_common.galaxy_reset import GalaxyReset
+from tt_umd import (
+    TTDevice,
+    ClusterDescriptor,
+    ARCH,
+    create_remote_wormhole_tt_device,
+    board_type_to_string,
+)
 from tt_topology import log
 
 LOG_FOLDER = os.path.expanduser("~/tt_topology_logs/")
 ORANGE = "\033[38;5;208m"
 
-def detect_current_topology(devices: List[PciChip]):
+def detect_current_topology(devices, umd_cluster_descriptor: Optional[ClusterDescriptor]):
     """
     Print all chips on host with their coordinates.
     Decipher if the chips have been flashed in any layout based on coordinates alone.
@@ -36,20 +43,38 @@ def detect_current_topology(devices: List[PciChip]):
         "Devices on system: ",
         CMD_LINE_COLOR.ENDC,
     )
-    for i, dev in enumerate(devices):
-        board_id = str(hex(dev.board_id())).replace("0x", "")
-        board_type = get_board_type(board_id)
-        board_type = board_type + (" R" if dev.is_remote() else " L")
-        coords = (
-            dev.as_wh().get_local_coord().shelf_x,
-            dev.as_wh().get_local_coord().shelf_y,
-        )
-        coord_list.append(coords)
-        print(
-            CMD_LINE_COLOR.BLUE,
-            f"{i}: {board_type} {board_id} - {coords}",
-            CMD_LINE_COLOR.ENDC,
-        )
+    if umd_cluster_descriptor is not None:
+        devices = umd_cluster_descriptor.get_all_chips()
+        for i in umd_cluster_descriptor.get_all_chips():
+            board_id = umd_cluster_descriptor.get_board_id_for_chip(i)
+            board_type = board_type_to_string(umd_cluster_descriptor.get_board_type(i))
+            board_type = board_type + (" R" if umd_cluster_descriptor.is_chip_remote(i) else " L")
+            eth_coord = umd_cluster_descriptor.get_chip_locations()[i]
+            coords = (
+                eth_coord.x,
+                eth_coord.y,
+            )
+            coord_list.append(coords)
+            print(
+                CMD_LINE_COLOR.BLUE,
+                f"{i}: {board_type} {board_id} - {coords}",
+                CMD_LINE_COLOR.ENDC,
+            )
+    else:
+        for i, dev in enumerate(devices):
+            board_id = str(hex(dev.board_id())).replace("0x", "")
+            board_type = get_board_type(board_id)
+            board_type = board_type + (" R" if dev.is_remote() else " L")
+            coords = (
+                dev.as_wh().get_local_coord().shelf_x,
+                dev.as_wh().get_local_coord().shelf_y,
+            )
+            coord_list.append(coords)
+            print(
+                CMD_LINE_COLOR.BLUE,
+                f"{i}: {board_type} {board_id} - {coords}",
+                CMD_LINE_COLOR.ENDC,
+            )
 
     if all(element == (0, 0) or element == (1, 0) for element in coord_list):
         print(
@@ -90,11 +115,18 @@ class TopoBackend:
 
     def __init__(
         self,
-        devices: List[PciChip],
+        devices: Optional[List[PciChip]] = None,
+        umd_cluster_descriptor: Optional[ClusterDescriptor] = None,
+        umd_local_only: bool = False,
         layout: str = "linear",
         plot_filename: str = "chip_layout.png",
     ):
-        self.devices = devices
+        self.use_umd = umd_cluster_descriptor is not None
+        if self.use_umd:
+            self.umd_cluster_descriptor = umd_cluster_descriptor
+            self.construct_umd_devices(umd_local_only)
+        else:
+            self.devices = devices
         self.layout = layout
         self.plot_filename = plot_filename
         self.log = log.TTToplogyLog(
@@ -108,6 +140,89 @@ class TopoBackend:
             coords_flash_config=[],
             errors="",
         )
+
+    def construct_umd_devices(self, local_only: bool = False):
+        """Construct UMD devices from cluster descriptor"""
+        chips_to_construct = self.umd_cluster_descriptor.get_chips_local_first(
+            self.umd_cluster_descriptor.get_all_chips()
+        )
+        self.umd_device_dict = {}
+        for chip in chips_to_construct:
+            if self.umd_cluster_descriptor.is_chip_mmio_capable(chip):
+                pci_device_num = self.umd_cluster_descriptor.get_chips_with_mmio()[chip]
+                self.umd_device_dict[chip] = TTDevice.create(pci_device_num)
+            else:
+                if local_only:
+                    continue
+                closest_mmio = self.umd_cluster_descriptor.get_closest_mmio_capable_chip(chip)
+                self.umd_device_dict[chip] = create_remote_wormhole_tt_device(
+                    self.umd_device_dict[closest_mmio], self.umd_cluster_descriptor, chip
+                )
+            self.umd_device_dict[chip].init_tt_device()
+
+    def get_devices(self) -> Dict[int, Any]:
+        """Get devices - returns either pyluwen devices or UMD devices"""
+        if self.use_umd:
+            return self.umd_device_dict
+        else:
+            return dict(enumerate(self.devices))
+
+    def get_device_by_index(self, idx: int):
+        """Get a specific device by index"""
+        if self.use_umd:
+            return self.umd_device_dict[idx]
+        else:
+            return self.devices[idx]
+
+    def is_wormhole(self, device_idx: int) -> bool:
+        """Check if device is Wormhole"""
+        if self.use_umd:
+            return self.umd_device_dict[device_idx].get_arch() == ARCH.WORMHOLE_B0
+        else:
+            return self.devices[device_idx].as_wh() is not None
+
+    def get_pci_interface_id(self, device_idx: int) -> str:
+        """Get PCI interface ID for device"""
+        if self.get_device_by_index(device_idx).is_remote():
+            return "N/A"
+        if self.use_umd:
+            return self.umd_device_dict[device_idx].get_pci_device().get_device_num()
+        else:
+            return self.devices[device_idx].get_pci_interface_id()
+
+    def get_board_id(self, device_idx: int) -> str:
+        """Get board ID for device"""
+        if self.use_umd:
+            return str(hex(self.umd_device_dict[device_idx].get_board_id())).replace("0x", "")
+        else:
+            return str(hex(self.devices[device_idx].board_id())).replace("0x", "")
+        
+    def get_board_type(self, device_idx: int): 
+        """Get board type for device"""
+        if self.use_umd:
+            return board_type_to_string(self.umd_cluster_descriptor.get_board_type(device_idx))
+        else:
+            return get_board_type(self.get_board_id(device_idx))
+
+    def get_wormhole_chip(self, device_idx: int):
+        """Get Wormhole chip object"""
+        if self.use_umd:
+            return self.umd_device_dict[device_idx]
+        else:
+            return self.devices[device_idx].as_wh()
+
+    # def reinit_devices(self, devices: Optional[List[PciChip]] = None, umd_cluster_descriptor: Optional[ClusterDescriptor] = None):
+    def reinit_devices(self, devices = None, umd_cluster_descriptor: Optional[ClusterDescriptor] = None):
+        """Reinitialize devices after reset"""
+        if umd_cluster_descriptor is not None:
+            self.use_umd = True
+            self.umd_cluster_descriptor = umd_cluster_descriptor
+            self.construct_umd_devices()
+        elif devices is not None:
+            self.use_umd = False
+            self.devices = devices
+        else:
+            raise ValueError("Must provide either devices or umd_cluster_descriptor")
 
     @staticmethod
     def eth_xy_decode(eth_id):
@@ -142,9 +257,10 @@ class TopoBackend:
     def get_eth_config_state(self):
         config_state = []
         config_state_log = []
-        for device in self.devices:
+        for idx in self.get_devices():
             dev_config_log = log.ChipConfig()
-            wh_chip = device.as_wh()
+            device = self.get_device_by_index(idx)
+            wh_chip = self.get_wormhole_chip(idx)
             fw_version = bytearray(4)
             chip_coord_l = bytearray(4)
             port_disable_l = bytearray(4)
@@ -160,7 +276,7 @@ class TopoBackend:
                 "port_disable_l": hex(int.from_bytes(port_disable_l, "little")),
                 "rack_shelf_l": hex(int.from_bytes(rack_self_l, "little")),
             }
-            dev_config_log.board_id = str(hex(device.board_id())).replace("0x", "") + (
+            dev_config_log.board_id = self.get_board_id(idx) + (
                 " R" if device.is_remote() else " L"
             )
             dev_config_log.fw_version = data["fw_version"]
@@ -220,8 +336,8 @@ class TopoBackend:
         Flash param table to default state
         Check if device is going to be trained
         """
-        for i, device in enumerate(self.devices):
-            wh_chip = device.as_wh()
+        for idx in self.get_devices():
+            wh_chip = self.get_wormhole_chip(idx)
             # Always flash left/local chip
             wh_chip.spi_write(
                 int(constants.ETH_PARAM_CHIP_COORD),
@@ -245,7 +361,7 @@ class TopoBackend:
             )
 
             # flash R chip info
-            if get_board_type(str(hex(device.board_id())).replace("0x", "")) == "n300":
+            if self.get_board_type(idx) == "n300":
                 wh_chip.spi_write(
                     int(
                         constants.ETH_PARAM_CHIP_COORD
@@ -286,7 +402,7 @@ class TopoBackend:
                     int(0x0).to_bytes(4, byteorder="little")
                     # bytearray([0x0, 0x0, 0x0, 0x0]),
                 )
-            board_id = str(hex(device.board_id())).replace("0x", "")
+            board_id = self.get_board_id(idx)
             # Left to right copy
             try:
                 wh_chip.arc_msg(
@@ -301,13 +417,13 @@ class TopoBackend:
             except Exception as e:
                 print(
                     CMD_LINE_COLOR.RED,
-                    f"Something went wrong with L to R copy for chip {i}: {board_id}!!\nError: {e}",
+                    f"Something went wrong with L to R copy for chip {idx}: {board_id}!!\nError: {e}",
                     CMD_LINE_COLOR.ENDC,
                 )
                 sys.exit(1)
             print(
                 CMD_LINE_COLOR.GREEN,
-                f"Completed default flash for board {i}: {board_id}",
+                f"Completed default flash for board {idx}: {board_id}",
                 CMD_LINE_COLOR.ENDC,
             )
 
@@ -343,11 +459,10 @@ class TopoBackend:
         """
         chip_data = {}
         log_connection_map = []
-        for idx, device in enumerate(self.devices):
-            chip = device.as_wh()
-            board_id = str(hex(device.board_id())).replace("0x", "")
-            board_type = get_board_type(board_id)
-            eth_board_info = self.get_local_eth_board_info(chip)
+        for idx, device in self.get_devices().items():
+            board_id = self.get_board_id(idx)
+            board_type = self.get_board_type(idx)
+            eth_board_info = self.get_local_eth_board_info(device)
 
             chip_data[eth_board_info] = {
                 "id": idx,
@@ -374,8 +489,10 @@ class TopoBackend:
         # c: {"id": 2, connections: [(0, "X"), (3, "X")]}
         # d: {"id": 3, connections: [(1, "T"), (2, "X")]}
         for eth_board_info, data in chip_data.items():
-            device = data["chip_obj"]
-            chip = data["chip_obj"].as_wh()
+            idx = data["id"]
+            chip = data["chip_obj"]
+            if not self.use_umd:
+                chip = chip.as_wh()
             connection_map_log_obj = None
             for log_obj in log_connection_map:
                 if log_obj.eth_board_info == eth_board_info:
@@ -915,7 +1032,8 @@ class TopoBackend:
             # Port disables:
             # 1. if it's a mesh, then don't disable anything
             # 2. if it's a torus or line, then disable the ports that aren't connected to the previous and next chip
-            chip_to_flash = chip_to_flash.as_wh()
+            if not self.use_umd:
+                chip_to_flash = chip_to_flash.as_wh()
             if connection_type == "mesh":
                 port_disable = 0x0
             else:
@@ -1080,7 +1198,8 @@ class TopoBackend:
 class TopoBackend_Octopus:
     def __init__(
         self,
-        devices: List[PciChip],
+        devices,
+        umd_cluster_descriptor: Optional[ClusterDescriptor],
         mobo_dict_list: List[dict],
     ):
         self.devices_local = devices
