@@ -13,7 +13,6 @@ import tt_topology.constants as constants
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.utils_common.tools_utils import (
     init_fw_defines,
-    get_board_type,
     init_logging,
     detect_chips_with_callback,
 )
@@ -23,6 +22,69 @@ from tt_topology import log
 
 LOG_FOLDER = os.path.expanduser("~/tt_topology_logs/")
 ORANGE = "\033[38;5;208m"
+
+
+def get_board_type(board_id: str) -> str:
+    """
+    Get board type from board ID string.
+    Ex:
+        Board ID: AA-BBBBB-C-D-EE-FF-XXX
+                   ^     ^ ^ ^  ^  ^   ^
+                   |     | | |  |  |   +- XXX
+                   |     | | |  |  +----- FF
+                   |     | | |  +-------- EE
+                   |     | | +----------- D
+                   |     | +------------- C = Revision
+                   |     +--------------- BBBBB = Unique Part Identifier (UPI)
+                   +--------------------- AA
+    """
+    if board_id == "N/A":
+        return "N/A"
+    serial_num = int(f"0x{board_id}", base=16)
+    upi = (serial_num >> 36) & 0xFFFFF
+
+    # Grayskull cards
+    if upi == 0x3:
+        return "e150"
+    elif upi == 0xA:
+        return "e300"
+    elif upi == 0x7:
+        return "e75"
+
+    # Wormhole cards
+    elif upi == 0x8:
+        return "nb_cb"
+    elif upi == 0xB:
+        return "wh_4u"
+    elif upi == 0x14:
+        return "n300"
+    elif upi == 0x18:
+        return "n150"
+    elif upi == 0x35:
+        return "tt-galaxy-wh"
+
+    # Blackhole cards
+    elif upi == 0x36:
+        return "bh-scrappy"
+    elif upi == 0x43:
+        return "p100a"
+    elif upi == 0x40:
+        return "p150a"
+    elif upi == 0x41:
+        return "p150b"
+    elif upi == 0x42:
+        return "p150c"
+    elif upi == 0x44:
+        return "p300b"
+    elif upi == 0x45:
+        return "p300a"
+    elif upi == 0x46:
+        return "p300c"
+    elif upi == 0x47:
+        return "tt-galaxy-bh"
+    else:
+        return "N/A"
+
 
 def detect_current_topology(devices: List[PciChip]):
     """
