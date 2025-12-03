@@ -1,63 +1,78 @@
 # TT-Topology
 
 Tenstorrent Topology (TT-Topology) is a command line utility
-used to flash multiple NB cards on a system to use specific eth routing configurations.
+used to flash multiple n150 or n300 cards on a system to use specific single-host ETH routing configurations.
 
-It curretly supports three configurtions - mesh, linear and torus
+It currently supports three configurations: mesh, linear, and torus.
+
+> [!WARNING]
+> `tt-topology` is not designed to be used with the following products:
+> - BH PCIe cards
+> - WH 6U Galaxy systems
+> - BH 6U Galaxy systems
+>
+> The tool will throw an error if used with unsupported products.
+>
+> Additionally, `tt-topology` is designed to be used only in a single-host context. Multi-host topologies will not be discovered.
 
 ## Official Repository
 
 [https://github.com/tenstorrent/tt-topology/](https://github.com/tenstorrent/tt-topology/)
 
-# Warning
-tt-topology is not applicable on the following:
-- BH pcie cards
-- WH 6U Galaxy systems
-- BH 6U Galaxy systems
-The tool will error out if used with unsupported baords
+## Getting started
 
-# Getting started
-Build and editing instruction are as follows -
+## Install Rust (if you don't already have it)
 
-## Building from Git
+If Rust isn't already installed on your system, you can install it through either of the following methods:
 
-Install and source rust for the luwen library
+### Using Distribution packages (preferred)
+
+- **Fedora / EL9**
+
+  `sudo dnf install cargo`
+
+- **Ubuntu / Debian**
+
+  `sudo apt install cargo`
+
+### Using Rustup
+
 ```
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source "$HOME/.cargo/env"
 ```
 
-## Optional
-Generate and source a python environment.  This is useful not only to isolate
-your environment, but potentially easier to debug and use.  This environment
-can be shared if you want to use a single environment for all your Tenstorrent
-tools
+## Installation (for users)
+
+`tt-topology` is available on PyPi and can be installed in your Python (v3.10 and up) environment using `pip`.
 
 ```
-python3 -m venv .venv
-source .venv/bin/activate
+pip install tt-topology
 ```
-## Required
 
-Install tt-topology - clone the repo, enter the folder and pip install
+> [!IMPORTANT]
+> It is always recommended to manage, build, and install Python packages within a virtual environment.
+>
+> A virtual environment can be created using `venv`:
+> ```
+> python -m venv .venv
+> source .venv/bin/activate
+> ```
+
+## Installation (for developers)
+
+### Clone the repository
+
 ```
 git clone https://github.com/tenstorrent/tt-topology.git
 cd tt-topology
-pip3 install --upgrade pip
-pip3 install .
 ```
 
-## Optional - for TT-Topology developers
-
-Generate and source a python3 environment
+### Install
 ```
-python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install pre-commit
+pip install .
 ```
-
-For users who would like to edit the code without re-building, install SMI in editable mode.
+or for users who would like to edit the code without re-building, install `tt-topology` in editable mode.
 ```
 pip install --editable .
 ```
@@ -94,7 +109,7 @@ options:
 ```
 # TT-Topology Procedure
 
-TT-Topology does the following when calculating and flashing the coordinates -
+TT-Topology does the following when calculating and flashing the coordinates:
 1. Flash all the boards to default - set all eth port disables to 0 and reset coordinates to (0,0) for local chips and (1,0) for n300 remote chips.
 2. Issue a board level reset to apply the new flash to the chips.
 3. Generate a mapping of all possible connections and their type between the available chips.
@@ -106,16 +121,19 @@ TT-Topology does the following when calculating and flashing the coordinates -
 
 # Chip layouts
 
-TT-topology can be used to flash one of the three chip layouts - mesh, linear and torus.
+TT-Topology can be used to flash one of the three chip layouts: mesh, linear and torus.
 
 ## Mesh
 
-In the mesh layout is a trivalent graph where each node can have a max of 3 connection. A BFS algorithm is used to assign the coordinates.
-Command to generate a mesh layout
+The mesh layout is a trivalent graph where each node can have a maximum of three connections. A BFS algorithm is used to assign the coordinates.
+
+The command to generate a mesh layout is:
+
 ```
 $ tt-topology -l mesh -p mesh_layout.png
 ```
-For a host with 2 n300 cards and 4 n300 cards, the command will generate a layouts that look as follows -
+
+For a host with two n300 cards and four n300 cards, the command will generate layouts that look like the following:
 
 <p align="center">
   <img src="images/mesh_layout_2x4.png?raw=true" alt="mesh_layout_2x4" width="47%"/>
@@ -125,12 +143,15 @@ For a host with 2 n300 cards and 4 n300 cards, the command will generate a layou
 
 ## Linear
 
-The linear layout, as the name suggests is a layout where all chips are connected by a single line. The coordinates are assigned by finding a cycle in the graph and then assigning coordinates in order.
-Command to generate a linear layout
+The linear layout, as the name suggests, is a layout where all chips are connected in a single line. The coordinates are assigned by finding a cycle in the graph and then assigning coordinates in order.
+
+The command to generate a linear layout is:
+
 ```
-$ tt-topology -l linear -f linear_layout.png
+$ tt-topology -l linear -p linear_layout.png
 ```
-For a host with 2 n300 cards and 4 n300 cards, the command will generate a layouts that look as follows -
+
+For a host with two n300 cards and four n300 cards, the command will generate layouts that look like the following:
 
 <p align="center">
   <img src="images/linear_layout_2x4.png?raw=true" alt="linear_layout_2x4" width="47%"/>
@@ -141,13 +162,17 @@ For a host with 2 n300 cards and 4 n300 cards, the command will generate a layou
 
 ## Torus
 
-The torus layout is a cyclic graph where all chips have a single line connecting all nodes.
+The torus layout is a cyclic graph where a single line connects all nodes.
+
 The coordinates are assigned by finding a cycle in the graph and then assigning coordinates in order.
-Command to generate a torus layout
+
+The command to generate a torus layout is:
+
 ```
 $ tt-topology -l torus -p torus_layout.png
 ```
-For a host with four n300 cards, the command will generate a layout that looks as follows
+
+For a host with two n300 cards and four n300 cards, the command will generate layouts that look like the following:
 
 <p align="center">
   <img src="images/torus_layout_2x4.png?raw=true" alt="torus_layout_2x4" width="47%"/>
@@ -155,9 +180,10 @@ For a host with four n300 cards, the command will generate a layout that looks a
   <img src="images/torus_layout.png?raw=true" alt="torus_layout_2x8" width="47%"/>
 </p>
 
-# Octopus(TGG/TG) Support in TT-Topology
-- TGG setting: 8 n150s connected to 2 galaxies
-- TG setting: 4 n150s connected to 1 galaxy
+# Octopus (TGG/TG) Support in TT-Topology
+
+- TGG setting: 8 n150 cards connected to 2 Galaxy 4U systems
+- TG setting: 8 n150 cards connected to 1 Galaxy 4U system
 
 ## Usage
 1. Generate a default mobo reset json file saved at ```~/.config/tenstorrent/reset_config.json``` by running the following command
@@ -232,10 +258,11 @@ For a host with four n300 cards, the command will generate a layout that looks a
 
 # Logging
 
-TT-Topology records the pre and post flash relevant SPI registers, connection map and coordinates of the chips in a .json file for record keeping and debugging.
-By default it is stored at ```~/tt_topology_logs/<timestamp>_log.json```. This can be changed by using the log command line argument as follows
+TT-Topology records the pre- and post-flash relevant SPI parameter values, connection maps, and coordinates of the chips in a .json file for record keeping and debugging.
+By default it is stored at ```~/tt_topology_logs/<timestamp>_log.json```. This can be changed by using the `--log` CLI arg:
+
 ```
-$ tt-topology -log new_log.json ...
+$ tt-topology --log new_log.json ...
 ```
 
 # License
