@@ -401,13 +401,20 @@ class TopoBackend:
                 remote_type = int.from_bytes(remote_type, "little")
                 remote_id = int.from_bytes(remote_id, "little")
                 remote_info = f"{(remote_type << 32) | remote_id:016x}"
+
+                remote_data = chip_data.get(remote_info)
                 # If there is no remote chip, continue
-                if remote_info == "0" * 16:
+                if remote_data is None:
+                    if remote_info != "0" * 16:
+                        print(
+                            CMD_LINE_COLOR.YELLOW,
+                            "Warning: Detected an unrecognized remote chip (likely on another host). This chip will be skipped, as multi-host topologies are not supported.",
+                            CMD_LINE_COLOR.ENDC,
+                        )
                     continue
 
                 # If there is a remote chip, add it to the connections list
                 # if it's not already there
-                remote_data = chip_data[remote_info]
                 if not any(remote_data["id"] == tup[0] for tup in data["connections"]):
                     if (
                         data["board_type"] in ["n300", "n150"]
