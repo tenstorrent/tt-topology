@@ -25,6 +25,12 @@ from tt_tools_common.reset_common.reset_utils import (
     parse_reset_input,
     ResetType,
 )
+from tt_umd import (
+    TopologyDiscovery,
+    WarmReset,
+    BoardType,
+    PCIDevice,
+)
 from tt_topology.backend import (
     TopoBackend,
     TopoBackend_Octopus,
@@ -113,10 +119,17 @@ def parse_args():
         dest="reset",
     )
 
+    parser.add_argument(
+        "--use_umd",
+        default=False,
+        action="store_true",
+        help="Use UMD instead of Luwen driver.",
+    )
+
     return parser
 
 
-def run_and_flash(topo_backend: TopoBackend):
+def run_and_flash(topo_backend: TopoBackend, use_umd: bool = False):
     """
     Main function of tt-topology. Performs the following steps -
     1. Flash all the boards to default - set all eth port disables to 0 and reset coordinates.
@@ -150,39 +163,54 @@ def run_and_flash(topo_backend: TopoBackend):
     )
 
     # Reset all pci devices
-    num_local_chips = len(topo_backend.devices)
-    reset_obj = WHChipReset()
-    pci_interfaces = [dev.get_pci_interface_id() for dev in topo_backend.devices]
+    if use_umd:
+        pci_interfaces = [topo_backend.get_pci_interface_id(i) for i in topo_backend.get_devices() if not topo_backend.is_remote(i)]
+    else:
+        pci_interfaces = [topo_backend.get_pci_interface_id(i) for i in range(len(topo_backend.devices))]
+    num_local_chips = len(pci_interfaces)
     print(
         CMD_LINE_COLOR.BLUE,
         f"Initiating reset on chips at pcie interface: {pci_interfaces}",
         CMD_LINE_COLOR.ENDC,
     )
-    reset_devices = reset_obj.full_lds_reset(pci_interfaces)
+    
+    if use_umd:
+        WarmReset.warm_reset(pci_interfaces)
+        # Figure out why we need to wait after reset.
+        # There is probably something wrong in how we wait for eth to be ready.
+        time.sleep(15)
+    else:
+        reset_obj = WHChipReset()
+        reset_devices = reset_obj.full_lds_reset(pci_interfaces)
+    
     print(
         CMD_LINE_COLOR.BLUE,
-        f"Completed reset on {len(reset_devices)} chips",
+        f"Completed reset on {len(pci_interfaces)} chips",
         CMD_LINE_COLOR.ENDC,
     )
+
+    # We need to reinit the devices immediately after reset.
+    # Detect all devices, including remote
+    if use_umd:
+        umd_cluster_descriptor = TopologyDiscovery.create_cluster_descriptor()
+        topo_backend.reinit_devices(umd_cluster_descriptor=umd_cluster_descriptor)
+    else:
+        topo_backend.reinit_devices(devices=detect_chips_with_callback())
 
     # Add new config to make sure flash happened correctly
     topo_backend.get_eth_config_state()
 
-    # wait time to make sure devices enumerate
-    # Detect all devices, including remote
-    topo_backend.devices = detect_chips_with_callback()
-
     print(
         CMD_LINE_COLOR.PURPLE,
-        f"Post reset detected : {len(topo_backend.devices)} chips",
+        f"Post reset detected : {len(topo_backend.get_devices())} chips",
         CMD_LINE_COLOR.ENDC,
     )
     # check number of devices
     #  TODO: FIX THIS THIS IS FOR NBX1
-    if len(topo_backend.devices) < num_local_chips * 2:
+    if len(topo_backend.get_devices()) < num_local_chips * 2:
         print(
             CMD_LINE_COLOR.RED,
-            f"NOT ALL BOARDS DETECTED!, detected {len(topo_backend.devices)}, expecting {num_local_chips * 2}",
+            f"NOT ALL BOARDS DETECTED!, detected {len(topo_backend.get_devices())}, expecting {num_local_chips * 2}",
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(1)
@@ -269,11 +297,23 @@ def run_and_flash(topo_backend: TopoBackend):
         f"Initiating reset on chips at pcie interface: {pci_interfaces}",
         CMD_LINE_COLOR.ENDC,
     )
-    reset_devices = reset_obj.full_lds_reset(pci_interfaces)
-    topo_backend.devices = detect_chips_with_callback()
+    
+    if use_umd:
+        WarmReset.warm_reset(pci_interfaces)
+        time.sleep(15)
+    else:
+        reset_devices = reset_obj.full_lds_reset(pci_interfaces)
+    
+    if use_umd:
+        umd_cluster_descriptor = TopologyDiscovery.create_cluster_descriptor()
+        topo_backend.reinit_devices(umd_cluster_descriptor=umd_cluster_descriptor)
+    else:
+        topo_backend.devices = detect_chips_with_callback()
+
+    
     print(
         CMD_LINE_COLOR.BLUE,
-        f"Completed reset on {len(topo_backend.devices)} chips",
+        f"Completed reset on {len(topo_backend.get_devices())} chips",
         CMD_LINE_COLOR.ENDC,
     )
     print()
@@ -298,11 +338,22 @@ def run_and_flash(topo_backend: TopoBackend):
         f"Initiating reset on chips at pcie interface: {pci_interfaces}",
         CMD_LINE_COLOR.ENDC,
     )
-    reset_devices = reset_obj.full_lds_reset(pci_interfaces)
-    topo_backend.devices = detect_chips_with_callback()
+    
+    if use_umd:
+        WarmReset.warm_reset(pci_interfaces)
+        time.sleep(15)
+    else:
+        reset_devices = reset_obj.full_lds_reset(pci_interfaces)
+    
+    if use_umd:
+        umd_cluster_descriptor = TopologyDiscovery.create_cluster_descriptor()
+        topo_backend.reinit_devices(umd_cluster_descriptor=umd_cluster_descriptor)
+    else:
+        topo_backend.devices = detect_chips_with_callback()
+
     print(
         CMD_LINE_COLOR.BLUE,
-        f"Completed reset on {len(topo_backend.devices)} chips",
+        f"Completed reset on {len(topo_backend.get_devices())} chips",
         CMD_LINE_COLOR.ENDC,
     )
     print()
@@ -437,7 +488,10 @@ def main():
     parser = parse_args()
     args = parser.parse_args()
 
-    driver = get_driver_version()
+    if args.use_umd:
+        driver = PCIDevice.read_kmd_version()
+    else:
+        driver = get_driver_version()
     if not driver:
         print(
             CMD_LINE_COLOR.RED,
@@ -446,7 +500,7 @@ def main():
         )
         sys.exit(1)
 
-    if not len(sys.argv) > 1:
+    if len(sys.argv) <= 1 or (args.use_umd and len(sys.argv) <= 2):
         # No arguments have been provided - print help and exit
         print(
             f"{CMD_LINE_COLOR.RED}No arguments provided! Please provide the required arguments....{CMD_LINE_COLOR.ENDC}"
@@ -455,22 +509,28 @@ def main():
         sys.exit(1)
 
     local_only = not args.list
+    
+    devices = None
+    umd_cluster_descriptor = None
 
     try:
-        if args.list or args.octopus:
+        if args.use_umd:
+            umd_cluster_descriptor = TopologyDiscovery.create_cluster_descriptor()
+        elif args.list or args.octopus:
             # We need eth of these options to have full noc access
             devices = detect_chips_with_callback(local_only=local_only, ignore_ethernet=False)
         else:
             # Only ignore eth for pcie chip flash
             devices = detect_chips_with_callback(local_only=local_only, ignore_ethernet=True)
     except Exception as e:
+        print(e)
         print(
             CMD_LINE_COLOR.RED,
             "No Tenstorrent devices detected! Please check your hardware and try again. Exiting...",
             CMD_LINE_COLOR.ENDC,
         )
         sys.exit(1)
-    if not devices:
+    if not devices and not umd_cluster_descriptor:
         print(
             CMD_LINE_COLOR.RED,
             "No Tenstorrent devices detected! Please check your hardware and try again. Exiting...",
@@ -481,13 +541,28 @@ def main():
     # Warn the user if any board is not in the accepted boards list
     supported_devices = []
     unsupported_device_names = []
-    for dev in devices:
-        board_type = get_board_type(str(hex(dev.board_id())).replace("0x", ""))
-        supported_boards = ["n300", "n150", "GALAXY"]
-        if board_type in supported_boards:
-            supported_devices.append(dev)
-        else:
-            unsupported_device_names.append(board_type)
+    wh_pci_idx = []
+    if args.use_umd:
+        for dev in umd_cluster_descriptor.get_all_chips():
+            # Skip remote chips
+            if umd_cluster_descriptor.is_chip_remote(dev):
+                continue
+            board_type = umd_cluster_descriptor.get_board_type(dev)
+            supported_boards = [BoardType.N150, BoardType.N300, BoardType.GALAXY]
+            if board_type in supported_boards:
+                supported_devices.append(dev)
+                wh_pci_idx.append(umd_cluster_descriptor.get_chips_with_mmio()[dev])
+            else:
+                unsupported_device_names.append(board_type)
+    else:
+        for dev in devices:
+            board_type = get_board_type(str(hex(dev.board_id())).replace("0x", ""))
+            supported_boards = ["n300", "n150", "GALAXY"]
+            if board_type in supported_boards:
+                supported_devices.append(dev)
+                wh_pci_idx.append(dev.board_id())
+            else:
+                unsupported_device_names.append(board_type)
 
     # Notify the user; empty lists are falsy
     if unsupported_device_names:
@@ -504,16 +579,18 @@ def main():
                 CMD_LINE_COLOR.ENDC,
             )
             sys.exit(1)
-    # Proceed with only supported devices
-    devices = supported_devices
+    
+    if not args.use_umd:
+        # Proceed with only supported devices
+        devices = supported_devices
 
     # List devices and config and exit
     if args.list:
-        detect_current_topology(devices)
+        detect_current_topology(devices, umd_cluster_descriptor)
         sys.exit()
 
     if args.generate_reset_json:
-        file = generate_reset_logs(devices)
+        file = generate_reset_logs(wh_pci_idx, [])
         print(
             CMD_LINE_COLOR.PURPLE,
             f"Generated sample reset config file for this host: {file}",
@@ -551,10 +628,13 @@ def main():
         sys.exit()
 
     else:
-        topo_backend = TopoBackend(devices, args.layout, args.plot)
+        if args.use_umd:
+            topo_backend = TopoBackend(umd_cluster_descriptor=umd_cluster_descriptor, umd_local_only=local_only, layout=args.layout, plot_filename=args.plot)
+        else:
+            topo_backend = TopoBackend(devices=devices, layout=args.layout, plot_filename=args.plot)
         errors = False
     try:
-        run_and_flash(topo_backend)
+        run_and_flash(topo_backend, use_umd=args.use_umd)
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
