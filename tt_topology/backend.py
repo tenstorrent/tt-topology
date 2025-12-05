@@ -13,7 +13,6 @@ import tt_topology.constants as constants
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.utils_common.tools_utils import (
     init_fw_defines,
-    get_board_type,
     init_logging,
     detect_chips_with_callback,
 )
@@ -23,6 +22,48 @@ from tt_topology import log
 
 LOG_FOLDER = os.path.expanduser("~/tt_topology_logs/")
 ORANGE = "\033[38;5;208m"
+
+
+def get_board_type(board_id: str) -> str:
+    """
+    Get board type from board ID string.
+    Ex:
+        Board ID: AA-BBBBB-C-D-EE-FF-XXX
+                   ^     ^ ^ ^  ^  ^   ^
+                   |     | | |  |  |   +- XXX
+                   |     | | |  |  +----- FF
+                   |     | | |  +-------- EE
+                   |     | | +----------- D
+                   |     | +------------- C = Revision
+                   |     +--------------- BBBBB = Unique Part Identifier (UPI)
+                   +--------------------- AA
+    """
+    UPI_TO_BOARD_TYPE = {
+        # Wormhole cards
+        0x8: "nb_cb",
+        0xB: "wh_4u",
+        0x14: "n300",
+        0x18: "n150",
+        0x35: "tt-galaxy-wh",
+        # Blackhole cards
+        0x36: "bh-scrappy",
+        0x43: "p100a",
+        0x40: "p150a",
+        0x41: "p150b",
+        0x42: "p150c",
+        0x44: "p300b",
+        0x45: "p300a",
+        0x46: "p300c",
+        0x47: "tt-galaxy-bh",
+    }
+    try:
+        serial_num = int(f"0x{board_id}", base=16)
+    except ValueError:
+        return "N/A"
+    upi = (serial_num >> 36) & 0xFFFFF
+
+    return UPI_TO_BOARD_TYPE.get(upi, "N/A")
+
 
 def detect_current_topology(devices: List[PciChip]):
     """
