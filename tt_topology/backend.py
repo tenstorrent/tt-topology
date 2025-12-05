@@ -38,52 +38,31 @@ def get_board_type(board_id: str) -> str:
                    |     +--------------- BBBBB = Unique Part Identifier (UPI)
                    +--------------------- AA
     """
-    if board_id == "N/A":
+    UPI_TO_BOARD_TYPE = {
+        # Wormhole cards
+        0x8: "nb_cb",
+        0xB: "wh_4u",
+        0x14: "n300",
+        0x18: "n150",
+        0x35: "tt-galaxy-wh",
+        # Blackhole cards
+        0x36: "bh-scrappy",
+        0x43: "p100a",
+        0x40: "p150a",
+        0x41: "p150b",
+        0x42: "p150c",
+        0x44: "p300b",
+        0x45: "p300a",
+        0x46: "p300c",
+        0x47: "tt-galaxy-bh",
+    }
+    try:
+        serial_num = int(f"0x{board_id}", base=16)
+    except ValueError:
         return "N/A"
-    serial_num = int(f"0x{board_id}", base=16)
     upi = (serial_num >> 36) & 0xFFFFF
 
-    # Grayskull cards
-    if upi == 0x3:
-        return "e150"
-    elif upi == 0xA:
-        return "e300"
-    elif upi == 0x7:
-        return "e75"
-
-    # Wormhole cards
-    elif upi == 0x8:
-        return "nb_cb"
-    elif upi == 0xB:
-        return "wh_4u"
-    elif upi == 0x14:
-        return "n300"
-    elif upi == 0x18:
-        return "n150"
-    elif upi == 0x35:
-        return "tt-galaxy-wh"
-
-    # Blackhole cards
-    elif upi == 0x36:
-        return "bh-scrappy"
-    elif upi == 0x43:
-        return "p100a"
-    elif upi == 0x40:
-        return "p150a"
-    elif upi == 0x41:
-        return "p150b"
-    elif upi == 0x42:
-        return "p150c"
-    elif upi == 0x44:
-        return "p300b"
-    elif upi == 0x45:
-        return "p300a"
-    elif upi == 0x46:
-        return "p300c"
-    elif upi == 0x47:
-        return "tt-galaxy-bh"
-    else:
-        return "N/A"
+    return UPI_TO_BOARD_TYPE.get(upi, "N/A")
 
 
 def detect_current_topology(devices: List[PciChip]):
