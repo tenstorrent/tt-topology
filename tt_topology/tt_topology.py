@@ -17,7 +17,6 @@ from tt_tools_common.utils_common.system_utils import (
     get_driver_version,
 )
 from tt_tools_common.utils_common.tools_utils import (
-    get_board_type,
     detect_chips_with_callback,
 )
 from tt_tools_common.reset_common.reset_utils import (
@@ -29,6 +28,7 @@ from tt_topology.backend import (
     TopoBackend,
     TopoBackend_Octopus,
     detect_current_topology,
+    get_board_type,
     ORANGE,
 )
 

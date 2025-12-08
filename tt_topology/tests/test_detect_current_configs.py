@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
 from tt_tools_common.utils_common.tools_utils import (
-    get_board_type,
     detect_chips_with_callback,
 )
+from tt_topology.backend import get_board_type
 
 
 def main():
