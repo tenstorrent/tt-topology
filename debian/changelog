@@ -1,3 +1,17 @@
+tt-topology (1.2.16) noble; urgency=medium
+
+  [ Petra Alexson ]
+  * Update get_board_type to include newer board types
+  * Address single-host assumption in generate_connection_map
+  * Edit README.md
+  * Refactor get_board_type
+  * Bump tt-tools-common version to 1.4.33
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 1.2.16
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Mon, 08 Dec 2025 16:40:57 +0000
+
 tt-topology (1.2.15) noble; urgency=medium
 
   [ Petra Alexson ]
