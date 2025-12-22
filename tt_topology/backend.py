@@ -833,17 +833,17 @@ class TopoBackend:
                     chip_to_flash = curr_flash_data["chip_obj"]
                     # flash eth coordinate check disable.
                     chip_to_flash.as_wh().spi_write(
-                        int(constants.ETH_COORD_CHECK_DISABLE),
+                        int(constants.ETH_PARAM_COORD_CHECK_DISABLE),
                         int(0x0).to_bytes(4, byteorder="little"),
                     )
                     # flash eth routing disable left.
                     chip_to_flash.as_wh().spi_write(
-                        int(constants.ETH_ROUTING_DISABLE_L),
+                        int(constants.ETH_PARAM_ROUTING_DISABLE),
                         int(0xC002).to_bytes(4, byteorder="little"),
                     )
                     # flash eth routing disable right.
                     chip_to_flash.as_wh().spi_write(
-                        int(constants.ETH_ROUTING_DISABLE_R),
+                        int(constants.ETH_PARAM_ROUTING_DISABLE + constants.ETH_PARAM_RIGHT_OFFSET),
                         int(0x02).to_bytes(4, byteorder="little"),
                     )
                     # L2R copy
@@ -873,17 +873,17 @@ class TopoBackend:
                     chip_to_flash = curr_flash_data["chip_obj"]
                     # flash eth coordinate check disable.
                     chip_to_flash.as_wh().spi_write(
-                        int(constants.ETH_COORD_CHECK_DISABLE),
+                        int(constants.ETH_PARAM_COORD_CHECK_DISABLE),
                         int(0x0).to_bytes(4, byteorder="little"),
                     )
                     # flash eth routing disable left.
                     chip_to_flash.as_wh().spi_write(
-                        int(constants.ETH_ROUTING_DISABLE_L),
+                        int(constants.ETH_PARAM_ROUTING_DISABLE),
                         int(0x302).to_bytes(4, byteorder="little"),
                     )
                     # flash eth routing disable right.
                     chip_to_flash.as_wh().spi_write(
-                        int(constants.ETH_ROUTING_DISABLE_R),
+                        int(constants.ETH_PARAM_ROUTING_DISABLE + constants.ETH_PARAM_RIGHT_OFFSET),
                         int(0x02).to_bytes(4, byteorder="little"),
                     )
                     # L2R copy
@@ -966,7 +966,7 @@ class TopoBackend:
             params = eth_param_vals[pci_index]
             # flash eth coordinate check disable
             chip_to_flash.spi_write(
-                int(constants.ETH_COORD_CHECK_DISABLE),
+                int(constants.ETH_PARAM_COORD_CHECK_DISABLE),
                 int(params.coord_check_disable).to_bytes(4, byteorder="little"),
             )
             # flash left chip coord
@@ -981,12 +981,12 @@ class TopoBackend:
             )
             # flash eth routing disable left
             chip_to_flash.spi_write(
-                int(constants.ETH_ROUTING_DISABLE_L),
+                int(constants.ETH_PARAM_ROUTING_DISABLE),
                 int(params.routing_disable_left).to_bytes(4, byteorder="little"),
             )
             # flash eth routing disable right
             chip_to_flash.spi_write(
-                int(constants.ETH_ROUTING_DISABLE_R),
+                int(constants.ETH_PARAM_ROUTING_DISABLE + constants.ETH_PARAM_RIGHT_OFFSET),
                 int(params.routing_disable_right).to_bytes(4, byteorder="little"),
             )
             # L2R copy
