@@ -46,9 +46,9 @@ def parse_args():
     parser.add_argument(
         "-l",
         "--layout",
-        choices=["linear", "torus", "mesh", "isolated"],
+        choices=["linear", "torus", "mesh", "mesh_v2", "isolated"],
         default="linear",
-        help="Select the layout (linear, torus, mesh, isolated). Default is linear.",
+        help="Select the layout (linear, torus, mesh, mesh_v2, isolated). Default is linear.",
     )
     parser.add_argument(
         "-o",
@@ -201,7 +201,7 @@ def run_and_flash(topo_backend: TopoBackend):
     )
 
     if num_connections_missing:
-        if topo_backend.layout == "mesh":
+        if topo_backend.layout in ["mesh", "mesh_v2"]:
             print(
             CMD_LINE_COLOR.RED,
             f"Error: Detected {num_connections_missing} missing physical connection(s) for mesh layout! It's possible cables are loose or missing.",
@@ -233,7 +233,7 @@ def run_and_flash(topo_backend: TopoBackend):
         coordinates_map = topo_backend.generate_coordinates_torus_or_linear(
             connection_data
         )
-    elif topo_backend.layout == "mesh":
+    elif topo_backend.layout in ["mesh", "mesh_v2"]:
         coordinates_map = topo_backend.generate_mesh_connection_independent(connection_data)
     else:
         print(
@@ -283,10 +283,12 @@ def run_and_flash(topo_backend: TopoBackend):
 
     # For the n300 enable multi-host mode by default.
     # Check for 8 n300 chips happens in the function
-    topo_backend.flash_n300_multihost(connection_data, coordinates_map)
+    if topo_backend.layout == "mesh_v2":
+        topo_backend.flash_n300_multihost_v2(connection_data, coordinates_map)
+    else:
+        topo_backend.flash_n300_multihost(connection_data, coordinates_map)
 
-    # TODO: I'm not sure what the purpose of the 15s sleep is after the other steps,
-    # so please adjust accordingly if we need to wait longer after this step.
+    # TODO: does this need 15s sleep?
     print(
         CMD_LINE_COLOR.PURPLE,
         "Sleeping for 5s ...",
