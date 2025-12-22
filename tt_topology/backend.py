@@ -8,6 +8,7 @@ import networkx as nx
 from typing import List
 from pyluwen import PciChip
 from collections import deque
+from dataclasses import dataclass
 import matplotlib.pyplot as plt
 import tt_topology.constants as constants
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
@@ -908,6 +909,108 @@ class TopoBackend:
                 "Completed multi-host n300 setup",
                 CMD_LINE_COLOR.ENDC,
             )
+        return
+
+    def flash_n300_multihost_v2(self, chip_data, coord_map):
+        """
+        Flash n300 boards in a multi-host configuration with mesh_v2 topology.
+        Will only be applied if there are 4 n300 boards aka 8 WH n300 chips.
+
+        Key differences in the mesh_v2 multihost config:
+        - Ethernet coordinates (@0x21100, @0x21200) are swapped between coord (1,0) and (1,1)
+        - Inter-mesh programming @0x2114c is swapped between coord (2,1) and (2,0)
+        """
+        # We need 8 chips and all of type n300
+        n300_chips = [data for data in chip_data.values() if data["board_type"] == "n300"]
+        if len(n300_chips) != 8 or self.layout != "mesh_v2":
+            # Not a multi-host n300 configuration
+            return
+
+        @dataclass
+        class EthParams:
+            coord_check_disable: int
+            chip_coord_left: int
+            chip_coord_right: int
+            routing_disable_left: int
+            routing_disable_right: int
+
+        eth_param_vals = {
+            (0, 1): EthParams(0x0, 0x101, 0x100, 0xc002, 0x2), # corresponds to PCI:0 in the reference
+            (1, 1): EthParams(0x0, 0x1, 0x0, 0x302, 0x2), # PCI:1 in ref
+            (2, 1): EthParams(0x0, 0x102, 0x103, 0xc002, 0x2), # PCI:2 in ref
+            (2, 0): EthParams(0x0, 0x2, 0x3, 0x302, 0x2), # PCI:3 in ref
+        }
+
+        print(
+            CMD_LINE_COLOR.YELLOW,
+            "Detected 4 n300 boards, applying multi-host n300 mesh_v2 flashing procedure",
+            CMD_LINE_COLOR.ENDC,
+        )
+        # Only flash chips with the following valid_coords
+        valid_coords = [(1, 0), (1, 1), (2, 1), (2, 0)]
+        filtered_coord_map = {cid: coord for cid, coord in coord_map.items() if coord in valid_coords}
+
+        # Apply mesh_v2 programming based on coordinates
+        for cid, coord in filtered_coord_map.items():
+            curr_chip_data = next(data for data in chip_data.values() if data["id"] == cid)
+            chip_to_flash = curr_chip_data["chip_obj"].as_wh()
+
+            print(
+                CMD_LINE_COLOR.BLUE,
+                f"Enabling multi-host mesh_v2 on coord {coord}",
+                CMD_LINE_COLOR.ENDC,
+            )
+
+            params = eth_param_vals[coord]
+            # flash eth coordinate check disable
+            chip_to_flash.spi_write(
+                int(constants.ETH_COORD_CHECK_DISABLE),
+                int(params.coord_check_disable).to_bytes(4, byteorder="little"),
+            )
+            # flash left chip coord
+            chip_to_flash.spi_write(
+                int(constants.ETH_PARAM_CHIP_COORD),
+                int(params.chip_coord_left).to_bytes(4, byteorder="little"),
+            )
+            # flash right chip coord
+            chip_to_flash.spi_write(
+                int(constants.ETH_PARAM_CHIP_COORD + constants.ETH_PARAM_RIGHT_OFFSET),
+                int(params.chip_coord_right).to_bytes(4, byteorder="little"),
+            )
+            # flash eth routing disable left
+            chip_to_flash.spi_write(
+                int(constants.ETH_ROUTING_DISABLE_L),
+                int(params.routing_disable_left).to_bytes(4, byteorder="little"),
+            )
+            # flash eth routing disable right
+            chip_to_flash.spi_write(
+                int(constants.ETH_ROUTING_DISABLE_R),
+                int(params.routing_disable_right).to_bytes(4, byteorder="little"),
+            )
+            # L2R copy
+            try:
+                chip_to_flash.arc_msg(
+                    init_fw_defines("wormhole", "tt_topology")[
+                        "MSG_TRIGGER_SPI_COPY_LtoR"
+                    ],
+                    wait_for_done=True,
+                    arg0=0,
+                    arg1=0,
+                    timeout=5,
+                )
+            except Exception as e:
+                print(
+                    CMD_LINE_COLOR.RED,
+                    "Failed to trigger L2R copy on chip:",
+                    curr_chip_data,
+                    CMD_LINE_COLOR.ENDC,
+                )
+
+        print(
+            CMD_LINE_COLOR.BLUE,
+            "Completed multi-host n300 mesh_v2 setup",
+            CMD_LINE_COLOR.ENDC,
+        )
         return
 
     def flash_to_specified_state(self, chip_data, coord_map):
