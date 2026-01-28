@@ -624,6 +624,33 @@ class TopoBackend:
         self.log.coordinate_map = coordinates
         return coordinates
 
+    def apply_mesh_v2_coordinates(self):
+        """
+        Manually apply the coordinates for the mesh_v2 layout.
+        - Ethernet coordinates (@0x21100, @0x21200) are swapped between PCI:0 and PCI:1
+
+        Returns:
+            Coordinate map with mesh_v2 layout applied
+        """
+        print(
+            CMD_LINE_COLOR.YELLOW,
+            "Applying mesh_v2 coordinates...",
+            CMD_LINE_COLOR.ENDC,
+        )
+
+        coordinates_map = {
+            0: (1, 1), # PCI:0 left chip
+            4: (0, 1), # PCI:0 right chip
+            1: (1, 0), # PCI:1 left chip
+            5: (0, 0), # PCI:1 right chip
+            2: (2, 1), # PCI:2 left chip
+            6: (3, 1), # PCI:2 right chip
+            3: (2, 0), # PCI:3 left chip
+            7: (3, 0), # PCI:3 right chip
+        }
+        
+        return coordinates_map
+
     def generate_coordinates_mesh(self, chip_data):
         """
         Generate coordinates for a fully connected topology using breadth first search
@@ -917,7 +944,6 @@ class TopoBackend:
         Will only be applied if there are 4 n300 boards aka 8 WH n300 chips.
 
         Key differences in the mesh_v2 multihost config:
-        - Ethernet coordinates (@0x21100, @0x21200) are swapped between PCI:0 and PCI:1
         - Inter-mesh programming @0x2114c is swapped between PCI:2 and PCI:3
         """
         # We need 8 chips and all of type n300
@@ -929,16 +955,14 @@ class TopoBackend:
         @dataclass
         class EthParams:
             coord_check_disable: int
-            chip_coord_left: int
-            chip_coord_right: int
             routing_disable_left: int
             routing_disable_right: int
 
         eth_param_vals = {
-            0: EthParams(0x0, 0x101, 0x100, 0xc002, 0x02),  # PCI:0
-            1: EthParams(0x0, 0x001, 0x000, 0x302, 0x02),   # PCI:1
-            2: EthParams(0x0, 0x102, 0x103, 0xc002, 0x02),  # PCI:2
-            3: EthParams(0x0, 0x002, 0x003, 0x302, 0x02),   # PCI:3
+            0: EthParams(0x0, 0xc002, 0x02),  # PCI:0
+            1: EthParams(0x0, 0x302, 0x02),   # PCI:1
+            2: EthParams(0x0, 0xc002, 0x02),  # PCI:2
+            3: EthParams(0x0, 0x302, 0x02),   # PCI:3
         }
 
         print(
@@ -968,16 +992,6 @@ class TopoBackend:
             chip_to_flash.spi_write(
                 int(constants.ETH_PARAM_COORD_CHECK_DISABLE),
                 int(params.coord_check_disable).to_bytes(4, byteorder="little"),
-            )
-            # flash left chip coord
-            chip_to_flash.spi_write(
-                int(constants.ETH_PARAM_CHIP_COORD),
-                int(params.chip_coord_left).to_bytes(4, byteorder="little"),
-            )
-            # flash right chip coord
-            chip_to_flash.spi_write(
-                int(constants.ETH_PARAM_CHIP_COORD + constants.ETH_PARAM_RIGHT_OFFSET),
-                int(params.chip_coord_right).to_bytes(4, byteorder="little"),
             )
             # flash eth routing disable left
             chip_to_flash.spi_write(

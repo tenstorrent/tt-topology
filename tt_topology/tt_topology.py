@@ -233,8 +233,10 @@ def run_and_flash(topo_backend: TopoBackend):
         coordinates_map = topo_backend.generate_coordinates_torus_or_linear(
             connection_data
         )
-    elif topo_backend.layout in ["mesh", "mesh_v2"]:
+    elif topo_backend.layout == "mesh":
         coordinates_map = topo_backend.generate_mesh_connection_independent(connection_data)
+    elif topo_backend.layout == "mesh_v2":
+        coordinates_map = topo_backend.apply_mesh_v2_coordinates()
     else:
         print(
             CMD_LINE_COLOR.RED,
@@ -250,7 +252,7 @@ def run_and_flash(topo_backend: TopoBackend):
         CMD_LINE_COLOR.ENDC,
     )
 
-    # # Flash the boards with generated coordinates
+    # Flash the boards with generated coordinates
     topo_backend.flash_to_specified_state(connection_data, coordinates_map)
     print(
         CMD_LINE_COLOR.PURPLE,
