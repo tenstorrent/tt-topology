@@ -1,3 +1,13 @@
+tt-topology (1.2.17) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * Chore: Bump pyluwen and tools common version to be smi compatible
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 1.2.17
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Thu, 29 Jan 2026 19:18:25 +0000
+
 tt-topology (1.2.16) noble; urgency=medium
 
   [ Petra Alexson ]
