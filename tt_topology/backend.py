@@ -8,6 +8,7 @@ import networkx as nx
 from typing import List
 from pyluwen import PciChip
 from collections import deque
+from dataclasses import dataclass
 import matplotlib.pyplot as plt
 import tt_topology.constants as constants
 from tt_tools_common.ui_common.themes import CMD_LINE_COLOR
@@ -623,6 +624,33 @@ class TopoBackend:
         self.log.coordinate_map = coordinates
         return coordinates
 
+    def apply_mesh_v2_coordinates(self):
+        """
+        Manually apply the coordinates for the mesh_v2 layout.
+        - Ethernet coordinates (@0x21100, @0x21200) are swapped between PCI:0 and PCI:1
+
+        Returns:
+            Coordinate map with mesh_v2 layout applied
+        """
+        print(
+            CMD_LINE_COLOR.YELLOW,
+            "Applying mesh_v2 coordinates...",
+            CMD_LINE_COLOR.ENDC,
+        )
+
+        coordinates_map = {
+            0: (1, 1), # PCI:0 left chip
+            4: (0, 1), # PCI:0 right chip
+            1: (1, 0), # PCI:1 left chip
+            5: (0, 0), # PCI:1 right chip
+            2: (2, 1), # PCI:2 left chip
+            6: (3, 1), # PCI:2 right chip
+            3: (2, 0), # PCI:3 left chip
+            7: (3, 0), # PCI:3 right chip
+        }
+        
+        return coordinates_map
+
     def generate_coordinates_mesh(self, chip_data):
         """
         Generate coordinates for a fully connected topology using breadth first search
@@ -832,17 +860,17 @@ class TopoBackend:
                     chip_to_flash = curr_flash_data["chip_obj"]
                     # flash eth coordinate check disable.
                     chip_to_flash.as_wh().spi_write(
-                        int(constants.ETH_COORD_CHECK_DISABLE),
+                        int(constants.ETH_PARAM_COORD_CHECK_DISABLE),
                         int(0x0).to_bytes(4, byteorder="little"),
                     )
                     # flash eth routing disable left.
                     chip_to_flash.as_wh().spi_write(
-                        int(constants.ETH_ROUTING_DISABLE_L),
+                        int(constants.ETH_PARAM_ROUTING_DISABLE),
                         int(0xC002).to_bytes(4, byteorder="little"),
                     )
                     # flash eth routing disable right.
                     chip_to_flash.as_wh().spi_write(
-                        int(constants.ETH_ROUTING_DISABLE_R),
+                        int(constants.ETH_PARAM_ROUTING_DISABLE + constants.ETH_PARAM_RIGHT_OFFSET),
                         int(0x02).to_bytes(4, byteorder="little"),
                     )
                     # L2R copy
@@ -872,17 +900,17 @@ class TopoBackend:
                     chip_to_flash = curr_flash_data["chip_obj"]
                     # flash eth coordinate check disable.
                     chip_to_flash.as_wh().spi_write(
-                        int(constants.ETH_COORD_CHECK_DISABLE),
+                        int(constants.ETH_PARAM_COORD_CHECK_DISABLE),
                         int(0x0).to_bytes(4, byteorder="little"),
                     )
                     # flash eth routing disable left.
                     chip_to_flash.as_wh().spi_write(
-                        int(constants.ETH_ROUTING_DISABLE_L),
+                        int(constants.ETH_PARAM_ROUTING_DISABLE),
                         int(0x302).to_bytes(4, byteorder="little"),
                     )
                     # flash eth routing disable right.
                     chip_to_flash.as_wh().spi_write(
-                        int(constants.ETH_ROUTING_DISABLE_R),
+                        int(constants.ETH_PARAM_ROUTING_DISABLE + constants.ETH_PARAM_RIGHT_OFFSET),
                         int(0x02).to_bytes(4, byteorder="little"),
                     )
                     # L2R copy
@@ -908,6 +936,97 @@ class TopoBackend:
                 "Completed multi-host n300 setup",
                 CMD_LINE_COLOR.ENDC,
             )
+        return
+
+    def flash_n300_multihost_v2(self, chip_data, coord_map):
+        """
+        Flash n300 boards in a multi-host configuration with mesh_v2 topology.
+        Will only be applied if there are 4 n300 boards aka 8 WH n300 chips.
+
+        Key differences in the mesh_v2 multihost config:
+        - Inter-mesh programming @0x2114c is swapped between PCI:2 and PCI:3
+        """
+        # We need 8 chips and all of type n300
+        n300_chips = [data for data in chip_data.values() if data["board_type"] == "n300"]
+        if len(n300_chips) != 8 or self.layout != "mesh_v2":
+            # Not a multi-host n300 configuration
+            return
+
+        @dataclass
+        class EthParams:
+            coord_check_disable: int
+            routing_disable_left: int
+            routing_disable_right: int
+
+        eth_param_vals = {
+            0: EthParams(0x0, 0xc002, 0x02),  # PCI:0
+            1: EthParams(0x0, 0x302, 0x02),   # PCI:1
+            2: EthParams(0x0, 0xc002, 0x02),  # PCI:2
+            3: EthParams(0x0, 0x302, 0x02),   # PCI:3
+        }
+
+        print(
+            CMD_LINE_COLOR.YELLOW,
+            "Detected 4 n300 boards, applying multi-host n300 mesh_v2 flashing procedure",
+            CMD_LINE_COLOR.ENDC,
+        )
+        # Only flash chips with valid PCI indices (0, 1, 2, 3)
+        valid_pci_indices = [0, 1, 2, 3]
+
+        # Apply mesh_v2 programming based on PCI index
+        for _, curr_chip_data in chip_data.items():
+            pci_index = curr_chip_data["id"]
+            if pci_index not in valid_pci_indices:
+                continue
+
+            chip_to_flash = curr_chip_data["chip_obj"].as_wh()
+
+            print(
+                CMD_LINE_COLOR.BLUE,
+                f"Enabling multi-host mesh_v2 on PCI:{pci_index}",
+                CMD_LINE_COLOR.ENDC,
+            )
+
+            params = eth_param_vals[pci_index]
+            # flash eth coordinate check disable
+            chip_to_flash.spi_write(
+                int(constants.ETH_PARAM_COORD_CHECK_DISABLE),
+                int(params.coord_check_disable).to_bytes(4, byteorder="little"),
+            )
+            # flash eth routing disable left
+            chip_to_flash.spi_write(
+                int(constants.ETH_PARAM_ROUTING_DISABLE),
+                int(params.routing_disable_left).to_bytes(4, byteorder="little"),
+            )
+            # flash eth routing disable right
+            chip_to_flash.spi_write(
+                int(constants.ETH_PARAM_ROUTING_DISABLE + constants.ETH_PARAM_RIGHT_OFFSET),
+                int(params.routing_disable_right).to_bytes(4, byteorder="little"),
+            )
+            # L2R copy
+            try:
+                chip_to_flash.arc_msg(
+                    init_fw_defines("wormhole", "tt_topology")[
+                        "MSG_TRIGGER_SPI_COPY_LtoR"
+                    ],
+                    wait_for_done=True,
+                    arg0=0,
+                    arg1=0,
+                    timeout=5,
+                )
+            except Exception as e:
+                print(
+                    CMD_LINE_COLOR.RED,
+                    "Failed to trigger L2R copy on chip:",
+                    curr_chip_data,
+                    CMD_LINE_COLOR.ENDC,
+                )
+
+        print(
+            CMD_LINE_COLOR.BLUE,
+            "Completed multi-host n300 mesh_v2 setup",
+            CMD_LINE_COLOR.ENDC,
+        )
         return
 
     def flash_to_specified_state(self, chip_data, coord_map):
@@ -964,7 +1083,7 @@ class TopoBackend:
             # 1. if it's a mesh, then don't disable anything
             # 2. if it's a torus or line, then disable the ports that aren't connected to the previous and next chip
             chip_to_flash = chip_to_flash.as_wh()
-            if connection_type == "mesh":
+            if connection_type in ["mesh", "mesh_v2"]:
                 port_disable = 0x0
             else:
                 port_disable = 0xFFFF
@@ -1097,7 +1216,7 @@ class TopoBackend:
             #  if torus, add edge between first and last node
             if self.layout == "linear":
                 G.remove_edge(cycle[0], cycle[-1])
-        elif self.layout == "mesh":
+        elif self.layout in ["mesh", "mesh_v2"]:
             graph_coords = coordinates
 
         nx.draw_networkx_edges(
