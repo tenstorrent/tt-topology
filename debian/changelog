@@ -1,3 +1,15 @@
+tt-topology (1.2.18) noble; urgency=medium
+
+  [ Petra Alexson ]
+  * Add mesh_v2 layout option and multi-host programming function
+  * Change multi-host constants to fit with format of other constants
+  * Perform mesh_v2 coordinate swap when generating coordinates_map
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 1.2.18
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Fri, 30 Jan 2026 22:04:57 +0000
+
 tt-topology (1.2.17) noble; urgency=medium
 
   [ Samridhi Bansal ]
