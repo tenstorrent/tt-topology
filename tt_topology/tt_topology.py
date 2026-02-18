@@ -165,12 +165,11 @@ def run_and_flash(topo_backend: TopoBackend):
         CMD_LINE_COLOR.ENDC,
     )
 
-    # Add new config to make sure flash happened correctly
-    topo_backend.get_eth_config_state()
-
-    # wait time to make sure devices enumerate
     # Detect all devices, including remote
     topo_backend.devices = detect_chips_with_callback()
+
+    # Add new config to make sure flash happened correctly
+    topo_backend.get_eth_config_state()
 
     print(
         CMD_LINE_COLOR.PURPLE,
