@@ -1,3 +1,13 @@
+tt-topology (1.2.19) noble; urgency=medium
+
+  [ Joel Smith ]
+  * Fix SIGBUS after device reset by reordering chip re-detection
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 1.2.19
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Thu, 26 Feb 2026 21:11:39 +0000
+
 tt-topology (1.2.18) noble; urgency=medium
 
   [ Petra Alexson ]
