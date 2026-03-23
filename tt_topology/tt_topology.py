@@ -30,7 +30,7 @@ from tt_topology.backend import (
     get_board_type,
     ORANGE,
 )
-from tt_umd import WarmReset
+from tt_umd import WarmReset, TopologyDiscovery, TopologyDiscoveryOptions, ClusterDescriptor
 
 
 def parse_args():
@@ -173,7 +173,11 @@ def run_and_flash(topo_backend: TopoBackend, use_luwen: bool):
     )
 
     # Detect all devices, including remote
-    topo_backend.devices = dict(enumerate(detect_chips_with_callback()))
+    # Rediscover devices before perfoming more reads.
+    if use_luwen:
+        topo_backend.devices = dict(enumerate(detect_chips_with_callback()))
+    else:
+        _, topo_backend.devices = TopologyDiscovery.discover()
 
     # Add new config to make sure flash happened correctly
     topo_backend.get_eth_config_state()
@@ -368,10 +372,22 @@ def main():
     try:
         if args.list:
             # We need eth of these options to have full noc access
-            devices = dict(enumerate(detect_chips_with_callback(local_only=local_only, ignore_ethernet=False)))
+            if args.use_luwen:
+                devices = dict(enumerate(detect_chips_with_callback(local_only=local_only, ignore_ethernet=False)))
+            else:
+                opts = TopologyDiscoveryOptions()
+                opts.wait_on_ethernet_link_training = True
+                opts.discover_remote_devices = True
+                umd_cluster_descriptor, devices = TopologyDiscovery.discover(opts)
         else:
             # Only ignore eth for pcie chip flash
-            devices = dict(enumerate(detect_chips_with_callback(local_only=local_only, ignore_ethernet=True)))
+            if args.use_luwen:
+                devices = dict(enumerate(detect_chips_with_callback(local_only=local_only, ignore_ethernet=True)))
+            else:
+                opts = TopologyDiscoveryOptions()
+                opts.wait_on_ethernet_link_training = False
+                opts.discover_remote_devices = False
+                umd_cluster_descriptor, devices = TopologyDiscovery.discover(opts)
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
@@ -415,10 +431,12 @@ def main():
             sys.exit(1)
     # Proceed with only supported devices
     devices = supported_devices
+    if not args.use_luwen:
+        umd_cluster_descriptor = ClusterDescriptor.create_constrained_cluster_descriptor(umd_cluster_descriptor, set(devices.keys()))
 
     # List devices and config and exit
     if args.list:
-        detect_current_topology(devices)
+        detect_current_topology(devices, umd_cluster_descriptor if not args.use_luwen else None)
         sys.exit()
 
     if args.generate_reset_json:

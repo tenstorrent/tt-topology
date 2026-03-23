@@ -5,8 +5,9 @@ import sys
 import datetime
 from pathlib import Path
 import networkx as nx
-from typing import Dict
+from typing import Dict, Optional, Union
 from pyluwen import PciChip
+from tt_umd import TTDevice, ClusterDescriptor, SPITTDevice
 from collections import deque
 from dataclasses import dataclass
 import matplotlib.pyplot as plt
@@ -65,7 +66,9 @@ def get_board_type(board_id: str) -> str:
     return UPI_TO_BOARD_TYPE.get(upi, "N/A")
 
 
-def detect_current_topology(devices: Dict[int, PciChip]):
+def detect_current_topology(
+        devices: Dict[int, Union[PciChip, TTDevice]],
+        umd_cluster_descriptor: Optional[ClusterDescriptor] = None):
     """
     Print all chips on host with their coordinates.
     Decipher if the chips have been flashed in any layout based on coordinates alone.
@@ -81,10 +84,17 @@ def detect_current_topology(devices: Dict[int, PciChip]):
         board_id = str(hex(dev.board_id())).replace("0x", "")
         board_type = get_board_type(board_id)
         board_type = board_type + (" R" if dev.is_remote() else " L")
-        coords = (
-            dev.as_wh().get_local_coord().shelf_x,
-            dev.as_wh().get_local_coord().shelf_y,
-        )
+        if umd_cluster_descriptor is not None:
+            eth_coord = umd_cluster_descriptor.get_chip_locations()[i]
+            coords = (
+                eth_coord.x,
+                eth_coord.y,
+            )
+        else:
+            coords = (
+                dev.as_wh().get_local_coord().shelf_x,
+                dev.as_wh().get_local_coord().shelf_y,
+            )
         coord_list.append(coords)
         print(
             CMD_LINE_COLOR.BLUE,
@@ -131,11 +141,12 @@ class TopoBackend:
 
     def __init__(
         self,
-        devices: Dict[int, PciChip],
+        devices: Dict[int, Union[PciChip, TTDevice]],
         layout: str = "linear",
         plot_filename: str = "chip_layout.png",
     ):
         self.devices = devices
+        self.use_luwen = isinstance(next(iter(devices.values())), PciChip)
         self.layout = layout
         self.plot_filename = plot_filename
         self.log = log.TTToplogyLog(
@@ -154,15 +165,23 @@ class TopoBackend:
         """
         Helper function to read spi given a chip idx, address and destination bytearray
         """
-        chip = self.devices[idx].as_wh()
-        chip.spi_read(addr, dest)
+        if self.use_luwen:
+            chip = self.devices[idx].as_wh()
+            chip.spi_read(addr, dest)
+        else:
+            chip_spi = SPITTDevice.create(self.devices[idx])
+            chip_spi.read(addr, dest)
 
     def spi_write(self, idx, addr, data):
         """
         Helper function to write spi given a chip idx, address and source bytearray
         """
-        chip = self.devices[idx].as_wh()
-        chip.spi_write(addr, data)
+        if self.use_luwen:
+            chip = self.devices[idx].as_wh()
+            chip.spi_write(addr, data)
+        else:
+            chip_spi = SPITTDevice.create(self.devices[idx])
+            chip_spi.write(addr, data)
 
     @staticmethod
     def eth_xy_decode(eth_id):
