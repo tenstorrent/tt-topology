@@ -30,6 +30,7 @@ from tt_topology.backend import (
     get_board_type,
     ORANGE,
 )
+from tt_umd import WarmReset
 
 
 def parse_args():
@@ -106,10 +107,17 @@ def parse_args():
         dest="reset",
     )
 
+    parser.add_argument(
+        "--use_luwen",
+        default=False,
+        action="store_true",
+        help="Use deprecated Luwen driver instead of UMD (default).",
+    )
+
     return parser
 
 
-def run_and_flash(topo_backend: TopoBackend):
+def run_and_flash(topo_backend: TopoBackend, use_luwen: bool):
     """
     Main function of tt-topology. Performs the following steps -
     1. Flash all the boards to default - set all eth port disables to 0 and reset coordinates.
@@ -144,17 +152,23 @@ def run_and_flash(topo_backend: TopoBackend):
 
     # Reset all pci devices
     num_local_chips = len(topo_backend.devices)
-    reset_obj = WHChipReset()
+    reset_obj = WHChipReset() if use_luwen else None
     pci_interfaces = [dev.get_pci_interface_id() for _, dev in topo_backend.devices.items()]
     print(
         CMD_LINE_COLOR.BLUE,
         f"Initiating reset on chips at pcie interface: {pci_interfaces}",
         CMD_LINE_COLOR.ENDC,
     )
-    reset_devices = reset_obj.full_lds_reset(pci_interfaces)
+    if use_luwen:
+        reset_obj.full_lds_reset(pci_interfaces)
+    else:
+        WarmReset.warm_reset(pci_interfaces)
+        # Figure out why we need to wait after reset.
+        # TODO tt-umd#1615
+        time.sleep(15)
     print(
         CMD_LINE_COLOR.BLUE,
-        f"Completed reset on {len(reset_devices)} chips",
+        f"Completed reset on {len(pci_interfaces)} chips",
         CMD_LINE_COLOR.ENDC,
     )
 
@@ -263,8 +277,16 @@ def run_and_flash(topo_backend: TopoBackend):
         f"Initiating reset on chips at pcie interface: {pci_interfaces}",
         CMD_LINE_COLOR.ENDC,
     )
-    reset_devices = reset_obj.full_lds_reset(pci_interfaces)
-    topo_backend.devices = dict(enumerate(detect_chips_with_callback()))
+    if use_luwen:
+        reset_obj.full_lds_reset(pci_interfaces)
+        topo_backend.devices = dict(enumerate(detect_chips_with_callback()))
+    else:
+        WarmReset.warm_reset(pci_interfaces)
+        # Figure out why we need to wait after reset.
+        # TODO tt-umd#1615
+        time.sleep(15)
+        _, topo_backend.devices = TopologyDiscovery.discover()
+    
     print(
         CMD_LINE_COLOR.BLUE,
         f"Completed reset on {len(topo_backend.devices)} chips",
@@ -294,8 +316,15 @@ def run_and_flash(topo_backend: TopoBackend):
         f"Initiating reset on chips at pcie interface: {pci_interfaces}",
         CMD_LINE_COLOR.ENDC,
     )
-    reset_devices = reset_obj.full_lds_reset(pci_interfaces)
-    topo_backend.devices = dict(enumerate(detect_chips_with_callback()))
+    if use_luwen:
+        reset_obj.full_lds_reset(pci_interfaces)
+        topo_backend.devices = dict(enumerate(detect_chips_with_callback()))
+    else:
+        WarmReset.warm_reset(pci_interfaces)
+        # Figure out why we need to wait after reset.
+        # TODO tt-umd#1615
+        time.sleep(15)
+        _, topo_backend.devices = TopologyDiscovery.discover()
     print(
         CMD_LINE_COLOR.BLUE,
         f"Completed reset on {len(topo_backend.devices)} chips",
@@ -409,7 +438,7 @@ def main():
     topo_backend = TopoBackend(devices, args.layout, args.plot)
     errors = False
     try:
-        run_and_flash(topo_backend)
+        run_and_flash(topo_backend, args.use_luwen)
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
