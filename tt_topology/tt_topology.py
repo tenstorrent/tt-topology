@@ -145,7 +145,7 @@ def run_and_flash(topo_backend: TopoBackend):
     # Reset all pci devices
     num_local_chips = len(topo_backend.devices)
     reset_obj = WHChipReset()
-    pci_interfaces = [dev.get_pci_interface_id() for dev in topo_backend.devices]
+    pci_interfaces = [dev.get_pci_interface_id() for _, dev in topo_backend.devices.items()]
     print(
         CMD_LINE_COLOR.BLUE,
         f"Initiating reset on chips at pcie interface: {pci_interfaces}",
@@ -159,7 +159,7 @@ def run_and_flash(topo_backend: TopoBackend):
     )
 
     # Detect all devices, including remote
-    topo_backend.devices = detect_chips_with_callback()
+    topo_backend.devices = dict(enumerate(detect_chips_with_callback()))
 
     # Add new config to make sure flash happened correctly
     topo_backend.get_eth_config_state()
@@ -264,7 +264,7 @@ def run_and_flash(topo_backend: TopoBackend):
         CMD_LINE_COLOR.ENDC,
     )
     reset_devices = reset_obj.full_lds_reset(pci_interfaces)
-    topo_backend.devices = detect_chips_with_callback()
+    topo_backend.devices = dict(enumerate(detect_chips_with_callback()))
     print(
         CMD_LINE_COLOR.BLUE,
         f"Completed reset on {len(topo_backend.devices)} chips",
@@ -295,7 +295,7 @@ def run_and_flash(topo_backend: TopoBackend):
         CMD_LINE_COLOR.ENDC,
     )
     reset_devices = reset_obj.full_lds_reset(pci_interfaces)
-    topo_backend.devices = detect_chips_with_callback()
+    topo_backend.devices = dict(enumerate(detect_chips_with_callback()))
     print(
         CMD_LINE_COLOR.BLUE,
         f"Completed reset on {len(topo_backend.devices)} chips",
@@ -339,10 +339,10 @@ def main():
     try:
         if args.list:
             # We need eth of these options to have full noc access
-            devices = detect_chips_with_callback(local_only=local_only, ignore_ethernet=False)
+            devices = dict(enumerate(detect_chips_with_callback(local_only=local_only, ignore_ethernet=False)))
         else:
             # Only ignore eth for pcie chip flash
-            devices = detect_chips_with_callback(local_only=local_only, ignore_ethernet=True)
+            devices = dict(enumerate(detect_chips_with_callback(local_only=local_only, ignore_ethernet=True)))
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
@@ -359,22 +359,22 @@ def main():
         sys.exit(1)
 
     # Warn the user if any board is not in the accepted boards list
-    supported_devices = []
-    unsupported_device_names = []
-    for dev in devices:
-        board_type = get_board_type(str(hex(dev.board_id())).replace("0x", ""))
+    supported_devices = {}
+    unsupported_device_names = {}
+    for chip_id, device in devices.items():
+        board_type = get_board_type(str(hex(device.board_id())).replace("0x", ""))
         supported_boards = ["n300", "n150"]
         if board_type in supported_boards:
-            supported_devices.append(dev)
+            supported_devices[chip_id] = device
         else:
-            unsupported_device_names.append(board_type)
+            unsupported_device_names[chip_id] = board_type
 
     # Notify the user; empty lists are falsy
     if unsupported_device_names:
         print(
             ORANGE,
             f"TT-Topology will only run on n300/n150 boards.\n",
-            f"Ignoring these devices: {', '.join(unsupported_device_names)}.",
+            f"Ignoring these devices: {', '.join(map(str, unsupported_device_names.values()))}.",
             CMD_LINE_COLOR.ENDC,
         )
         if not supported_devices:
@@ -393,7 +393,7 @@ def main():
         sys.exit()
 
     if args.generate_reset_json:
-        file = generate_reset_logs(devices)
+        file = generate_reset_logs(list(devices.values()))
         print(
             CMD_LINE_COLOR.PURPLE,
             f"Generated sample reset config file for this host: {file}",

@@ -5,7 +5,7 @@ import sys
 import datetime
 from pathlib import Path
 import networkx as nx
-from typing import List
+from typing import Dict
 from pyluwen import PciChip
 from collections import deque
 from dataclasses import dataclass
@@ -65,7 +65,7 @@ def get_board_type(board_id: str) -> str:
     return UPI_TO_BOARD_TYPE.get(upi, "N/A")
 
 
-def detect_current_topology(devices: List[PciChip]):
+def detect_current_topology(devices: Dict[int, PciChip]):
     """
     Print all chips on host with their coordinates.
     Decipher if the chips have been flashed in any layout based on coordinates alone.
@@ -77,7 +77,7 @@ def detect_current_topology(devices: List[PciChip]):
         "Devices on system: ",
         CMD_LINE_COLOR.ENDC,
     )
-    for i, dev in enumerate(devices):
+    for i, dev in devices.items():
         board_id = str(hex(dev.board_id())).replace("0x", "")
         board_type = get_board_type(board_id)
         board_type = board_type + (" R" if dev.is_remote() else " L")
@@ -131,7 +131,7 @@ class TopoBackend:
 
     def __init__(
         self,
-        devices: List[PciChip],
+        devices: Dict[int, PciChip],
         layout: str = "linear",
         plot_filename: str = "chip_layout.png",
     ):
@@ -183,7 +183,7 @@ class TopoBackend:
     def get_eth_config_state(self):
         config_state = []
         config_state_log = []
-        for device in self.devices:
+        for idx, device in self.devices.items():
             dev_config_log = log.ChipConfig()
             wh_chip = device.as_wh()
             fw_version = bytearray(4)
@@ -261,7 +261,7 @@ class TopoBackend:
         Flash param table to default state
         Check if device is going to be trained
         """
-        for i, device in enumerate(self.devices):
+        for i, device in self.devices.items():
             wh_chip = device.as_wh()
             # Always flash left/local chip
             wh_chip.spi_write(
@@ -384,7 +384,7 @@ class TopoBackend:
         """
         chip_data = {}
         log_connection_map = []
-        for idx, device in enumerate(self.devices):
+        for idx, device in self.devices.items():
             chip = device.as_wh()
             board_id = str(hex(device.board_id())).replace("0x", "")
             board_type = get_board_type(board_id)
@@ -665,7 +665,10 @@ class TopoBackend:
         adjacency_map = {data["id"]: data["connections"] for data in chip_data.values()}
         coordinates = {}
         visited = set()
-        chip_l_or_r = ["R" if chip.is_remote() else "L" for chip in self.devices]
+        chip_l_or_r = {
+            idx: ("R" if chip.is_remote() else "L")
+            for idx, chip in self.devices.items()
+        }
 
         for chip in adjacency_map:
             if len(adjacency_map[chip]) == 2:
