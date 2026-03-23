@@ -150,6 +150,20 @@ class TopoBackend:
             errors="",
         )
 
+    def spi_read(self, idx, addr, dest):
+        """
+        Helper function to read spi given a chip idx, address and destination bytearray
+        """
+        chip = self.devices[idx].as_wh()
+        chip.spi_read(addr, dest)
+
+    def spi_write(self, idx, addr, data):
+        """
+        Helper function to write spi given a chip idx, address and source bytearray
+        """
+        chip = self.devices[idx].as_wh()
+        chip.spi_write(addr, data)
+
     @staticmethod
     def eth_xy_decode(eth_id):
         if (eth_id % 2) == 1:
@@ -190,10 +204,10 @@ class TopoBackend:
             chip_coord_l = bytearray(4)
             port_disable_l = bytearray(4)
             rack_self_l = bytearray(4)
-            wh_chip.spi_read(int(constants.ETH_FW_VERSION_ADDR), fw_version)
-            wh_chip.spi_read(int(constants.ETH_PARAM_CHIP_COORD), chip_coord_l)
-            wh_chip.spi_read(int(constants.ETH_PARAM_PORT_DISABLE), port_disable_l)
-            wh_chip.spi_read(int(constants.ETH_PARAM_RACK_SHELF), rack_self_l)
+            self.spi_read(idx, int(constants.ETH_FW_VERSION_ADDR), fw_version)
+            self.spi_read(idx, int(constants.ETH_PARAM_CHIP_COORD), chip_coord_l)
+            self.spi_read(idx, int(constants.ETH_PARAM_PORT_DISABLE), port_disable_l)
+            self.spi_read(idx, int(constants.ETH_PARAM_RACK_SHELF), rack_self_l)
             data = {
                 "wh_chip": wh_chip,
                 "fw_version": hex(int.from_bytes(fw_version, "little")),
@@ -213,21 +227,24 @@ class TopoBackend:
                 chip_coord_r = bytearray(4)
                 port_disable_r = bytearray(4)
                 rack_self_r = bytearray(4)
-                wh_chip.spi_read(
+                self.spi_read(
+                    idx,
                     int(
                         constants.ETH_PARAM_CHIP_COORD
                         + constants.ETH_PARAM_RIGHT_OFFSET
                     ),
                     chip_coord_r,
                 )
-                wh_chip.spi_read(
+                self.spi_read(
+                    idx,
                     int(
                         constants.ETH_PARAM_PORT_DISABLE
                         + constants.ETH_PARAM_RIGHT_OFFSET
                     ),
                     port_disable_r,
                 )
-                wh_chip.spi_read(
+                self.spi_read(
+                    idx,
                     int(
                         constants.ETH_PARAM_RACK_SHELF
                         + constants.ETH_PARAM_RIGHT_OFFSET
@@ -262,24 +279,27 @@ class TopoBackend:
         Check if device is going to be trained
         """
         for i, device in self.devices.items():
-            wh_chip = device.as_wh()
             # Always flash left/local chip
-            wh_chip.spi_write(
+            self.spi_write(
+                i,
                 int(constants.ETH_PARAM_CHIP_COORD),
                 int(0x0).to_bytes(4, byteorder="little"),
             )
             # If in isolated mode, set ethernet port to disabled
             if self.layout == "isolated":
-                wh_chip.spi_write(
+                self.spi_write(
+                    i,
                     int(constants.ETH_PARAM_PORT_DISABLE),
                     bytearray([0xFF, 0xFC, 0x00, 0x00]),
                 )
             else:
-                wh_chip.spi_write(
+                self.spi_write(
+                    i,
                     int(constants.ETH_PARAM_PORT_DISABLE),
                     int(0x0).to_bytes(4, byteorder="little"),
                 )
-            wh_chip.spi_write(
+            self.spi_write(
+                i,
                 int(constants.ETH_PARAM_RACK_SHELF),
                 int(0x0).to_bytes(4, byteorder="little")
                 # bytearray([0x0, 0x0, 0x0, 0x0])
@@ -287,7 +307,8 @@ class TopoBackend:
 
             # flash R chip info
             if get_board_type(str(hex(device.board_id())).replace("0x", "")) == "n300":
-                wh_chip.spi_write(
+                self.spi_write(
+                    i,
                     int(
                         constants.ETH_PARAM_CHIP_COORD
                         + constants.ETH_PARAM_RIGHT_OFFSET
@@ -295,7 +316,8 @@ class TopoBackend:
                     int(0x1).to_bytes(4, byteorder="little"),
                 )
                 chip_coord_r = bytearray(4)
-                wh_chip.spi_read(
+                self.spi_read(
+                    i,
                     int(
                         constants.ETH_PARAM_CHIP_COORD
                         + constants.ETH_PARAM_RIGHT_OFFSET
@@ -304,7 +326,8 @@ class TopoBackend:
                 )
                 # If in isolated mode, set ethernet port to disabled
                 if self.layout == "isolated":
-                    wh_chip.spi_write(
+                    self.spi_write(
+                        i,
                         int(
                             constants.ETH_PARAM_PORT_DISABLE
                             + constants.ETH_PARAM_RIGHT_OFFSET
@@ -312,14 +335,16 @@ class TopoBackend:
                         bytearray([0xFC, 0xFF, 0x0, 0x0]),
                     )
                 else:
-                    wh_chip.spi_write(
+                    self.spi_write(
+                        i,
                         int(
                             constants.ETH_PARAM_PORT_DISABLE
                             + constants.ETH_PARAM_RIGHT_OFFSET
                         ),
                         int(0x0).to_bytes(4, byteorder="little"),
                     )
-                wh_chip.spi_write(
+                self.spi_write(
+                    i,
                     int(
                         constants.ETH_PARAM_RACK_SHELF
                         + constants.ETH_PARAM_RIGHT_OFFSET
@@ -330,6 +355,7 @@ class TopoBackend:
             board_id = str(hex(device.board_id())).replace("0x", "")
             # Left to right copy
             try:
+                wh_chip = device.as_wh()
                 wh_chip.arc_msg(
                     init_fw_defines("wormhole", "tt_topology")[
                         "MSG_TRIGGER_SPI_COPY_LtoR"
@@ -425,7 +451,7 @@ class TopoBackend:
 
             # get fw version and collect remote_info accordingly
             chip_eth_fw_ver = bytearray(4)
-            chip.spi_read(int(constants.ETH_FW_VERSION_ADDR), chip_eth_fw_ver)
+            self.spi_read(idx, int(constants.ETH_FW_VERSION_ADDR), chip_eth_fw_ver)
             chip_eth_fw_ver = int.from_bytes(chip_eth_fw_ver, "little")
             # Go through all 16 ETH ports and read their remote chip ids (if applicable)
             # Use those IDs to construct the vectorized representation
@@ -861,17 +887,20 @@ class TopoBackend:
                             break
                     chip_to_flash = curr_flash_data["chip_obj"]
                     # flash eth coordinate check disable.
-                    chip_to_flash.as_wh().spi_write(
+                    self.spi_write(
+                        cid,
                         int(constants.ETH_PARAM_COORD_CHECK_DISABLE),
                         int(0x0).to_bytes(4, byteorder="little"),
                     )
                     # flash eth routing disable left.
-                    chip_to_flash.as_wh().spi_write(
+                    self.spi_write(
+                        cid,
                         int(constants.ETH_PARAM_ROUTING_DISABLE),
                         int(0xC002).to_bytes(4, byteorder="little"),
                     )
                     # flash eth routing disable right.
-                    chip_to_flash.as_wh().spi_write(
+                    self.spi_write(
+                        cid,
                         int(constants.ETH_PARAM_ROUTING_DISABLE + constants.ETH_PARAM_RIGHT_OFFSET),
                         int(0x02).to_bytes(4, byteorder="little"),
                     )
@@ -901,17 +930,20 @@ class TopoBackend:
                             break
                     chip_to_flash = curr_flash_data["chip_obj"]
                     # flash eth coordinate check disable.
-                    chip_to_flash.as_wh().spi_write(
+                    self.spi_write(
+                        cid,
                         int(constants.ETH_PARAM_COORD_CHECK_DISABLE),
                         int(0x0).to_bytes(4, byteorder="little"),
                     )
                     # flash eth routing disable left.
-                    chip_to_flash.as_wh().spi_write(
+                    self.spi_write(
+                        cid,
                         int(constants.ETH_PARAM_ROUTING_DISABLE),
                         int(0x302).to_bytes(4, byteorder="little"),
                     )
                     # flash eth routing disable right.
-                    chip_to_flash.as_wh().spi_write(
+                    self.spi_write(
+                        cid,
                         int(constants.ETH_PARAM_ROUTING_DISABLE + constants.ETH_PARAM_RIGHT_OFFSET),
                         int(0x02).to_bytes(4, byteorder="little"),
                     )
@@ -1139,15 +1171,17 @@ class TopoBackend:
 
             # TODO: make sure local chips are getting flashed twice correctly
 
-            chip_to_flash.spi_write(coord_addr, bytearray([x, y, 0x0, 0x0]))
-            chip_to_flash.spi_write(
+            self.spi_write(curr_flash_data["id"], coord_addr, bytearray([x, y, 0x0, 0x0]))
+            self.spi_write(
+                curr_flash_data["id"],
                 port_disable_addr,
                 bytearray([port_disable & 0xFF, (port_disable >> 8) & 0xFF, 0x0, 0x0]),
             )
             readback_local = bytearray(4)
             readback_remote = bytearray(4)
-            chip_to_flash.spi_read(coord_addr, readback_local)
-            chip_to_flash.spi_read(
+            self.spi_read(curr_flash_data["id"], coord_addr, readback_local)
+            self.spi_read(
+                curr_flash_data["id"],
                 port_disable_addr,
                 readback_remote,
             )
