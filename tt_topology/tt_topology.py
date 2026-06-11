@@ -26,11 +26,11 @@ from tt_tools_common.reset_common.reset_utils import (
 )
 from tt_topology.backend import (
     TopoBackend,
-    TopoBackend_Octopus,
     detect_current_topology,
     get_board_type,
     ORANGE,
 )
+from tt_umd import WarmReset, TopologyDiscovery, TopologyDiscoveryOptions, ClusterDescriptor
 
 
 def parse_args():
@@ -49,12 +49,6 @@ def parse_args():
         choices=["linear", "torus", "mesh", "mesh_v2", "isolated"],
         default="linear",
         help="Select the layout (linear, torus, mesh, mesh_v2, isolated). Default is linear.",
-    )
-    parser.add_argument(
-        "-o",
-        "--octopus",
-        action="store_true",
-        default=False,
     )
     parser.add_argument(
         "-f",
@@ -113,10 +107,17 @@ def parse_args():
         dest="reset",
     )
 
+    parser.add_argument(
+        "--use_luwen",
+        default=False,
+        action="store_true",
+        help="Use deprecated Luwen driver instead of UMD (default).",
+    )
+
     return parser
 
 
-def run_and_flash(topo_backend: TopoBackend):
+def run_and_flash(topo_backend: TopoBackend, use_luwen: bool):
     """
     Main function of tt-topology. Performs the following steps -
     1. Flash all the boards to default - set all eth port disables to 0 and reset coordinates.
@@ -151,22 +152,32 @@ def run_and_flash(topo_backend: TopoBackend):
 
     # Reset all pci devices
     num_local_chips = len(topo_backend.devices)
-    reset_obj = WHChipReset()
-    pci_interfaces = [dev.get_pci_interface_id() for dev in topo_backend.devices]
+    reset_obj = WHChipReset() if use_luwen else None
+    pci_interfaces = [dev.get_pci_interface_id() for _, dev in topo_backend.devices.items()]
     print(
         CMD_LINE_COLOR.BLUE,
         f"Initiating reset on chips at pcie interface: {pci_interfaces}",
         CMD_LINE_COLOR.ENDC,
     )
-    reset_devices = reset_obj.full_lds_reset(pci_interfaces)
+    if use_luwen:
+        reset_obj.full_lds_reset(pci_interfaces)
+    else:
+        WarmReset.warm_reset(pci_interfaces)
+        # Figure out why we need to wait after reset.
+        # TODO tt-umd#1615
+        time.sleep(15)
     print(
         CMD_LINE_COLOR.BLUE,
-        f"Completed reset on {len(reset_devices)} chips",
+        f"Completed reset on {len(pci_interfaces)} chips",
         CMD_LINE_COLOR.ENDC,
     )
 
     # Detect all devices, including remote
-    topo_backend.devices = detect_chips_with_callback()
+    # Rediscover devices before perfoming more reads.
+    if use_luwen:
+        topo_backend.devices = dict(enumerate(detect_chips_with_callback()))
+    else:
+        _, topo_backend.devices = TopologyDiscovery.discover()
 
     # Add new config to make sure flash happened correctly
     topo_backend.get_eth_config_state()
@@ -270,8 +281,16 @@ def run_and_flash(topo_backend: TopoBackend):
         f"Initiating reset on chips at pcie interface: {pci_interfaces}",
         CMD_LINE_COLOR.ENDC,
     )
-    reset_devices = reset_obj.full_lds_reset(pci_interfaces)
-    topo_backend.devices = detect_chips_with_callback()
+    if use_luwen:
+        reset_obj.full_lds_reset(pci_interfaces)
+        topo_backend.devices = dict(enumerate(detect_chips_with_callback()))
+    else:
+        WarmReset.warm_reset(pci_interfaces)
+        # Figure out why we need to wait after reset.
+        # TODO tt-umd#1615
+        time.sleep(15)
+        _, topo_backend.devices = TopologyDiscovery.discover()
+    
     print(
         CMD_LINE_COLOR.BLUE,
         f"Completed reset on {len(topo_backend.devices)} chips",
@@ -301,8 +320,15 @@ def run_and_flash(topo_backend: TopoBackend):
         f"Initiating reset on chips at pcie interface: {pci_interfaces}",
         CMD_LINE_COLOR.ENDC,
     )
-    reset_devices = reset_obj.full_lds_reset(pci_interfaces)
-    topo_backend.devices = detect_chips_with_callback()
+    if use_luwen:
+        reset_obj.full_lds_reset(pci_interfaces)
+        topo_backend.devices = dict(enumerate(detect_chips_with_callback()))
+    else:
+        WarmReset.warm_reset(pci_interfaces)
+        # Figure out why we need to wait after reset.
+        # TODO tt-umd#1615
+        time.sleep(15)
+        _, topo_backend.devices = TopologyDiscovery.discover()
     print(
         CMD_LINE_COLOR.BLUE,
         f"Completed reset on {len(topo_backend.devices)} chips",
@@ -315,122 +341,6 @@ def run_and_flash(topo_backend: TopoBackend):
 
     # Generate graph visualization
     topo_backend.graph_visualization(connection_data, coordinates_map)
-
-
-def program_galaxy(topo_backend_octo: TopoBackend_Octopus):
-    """
-    Main function of tt-topology for galaxy. Performs the following steps -
-    1. set eth-mobo-enable on every n150
-    2. program the shelf/rack
-    3. program all n150s to R0, S0, X0, Y0
-    4. Reset with retimer_sel and disable_sel and wait for training
-    5. check QSFP link and change shelf number for each n150
-    6. program the x/y coords of the local n150s
-    7. reset with retimer_sel and disable_sel and wait for training, and verify all chips show up
-    """
-    disabled_ports_before = [
-        "0:0",
-        "0:1",
-        "0:2",
-        "1:0",
-        "1:1",
-        "1:2",
-        "6:0",
-        "6:1",
-        "6:2",
-        "7:0",
-        "7:1",
-        "7:2",
-    ]
-
-    if topo_backend_octo.mobo_dict_list is None:
-        print(
-            CMD_LINE_COLOR.RED,
-            "No reset json file provided for octopus",
-            CMD_LINE_COLOR.ENDC,
-        )
-        sys.exit(1)
-    else:
-        mobo_dict_list = topo_backend_octo.mobo_dict_list["wh_mobo_reset"]
-
-    mobo_dict_before = []
-    mobo_dict_after = []
-
-    for item in mobo_dict_list:
-        mobo_dict_before.append(
-            {
-                "nb_host_pci_idx": item["nb_host_pci_idx"],
-                "mobo": item["mobo"],
-                "credo": item["credo"],
-                # disabled_ports_before always disables all by default, should exclude the specified nb->galaxy ports in the config
-                "disabled_ports": list(set(disabled_ports_before) - set(item["credo"])),
-            }
-        )
-        mobo_dict_after.append(
-            {
-                "nb_host_pci_idx": item["nb_host_pci_idx"],
-                "mobo": item["mobo"],
-                "credo": item["credo"],
-                "disabled_ports": item["disabled_ports"],
-            }
-        )
-
-    print("set eth-mobo-enable on every n150")
-    topo_backend_octo.eth_mobo_enable()
-
-    print("program the remote shelf/rack")
-    topo_backend_octo.set_rack_shelf_remote(mobo_dict_list)
-
-    print("program all n150s to R0, S0, X0, Y0")
-    topo_backend_octo.set_initial_chip_coords()
-
-    print("reset with retimer_sel and disable_sel and wait for training")
-
-    topo_backend_octo.galaxy_reset(mobo_dict_before)
-
-    print(
-        "check QSFP link and change rack, shelf, x, y coordinated for each of the local n150s"
-    )
-    topo_backend_octo.read_remote_set_local()
-
-    print(
-        "reset with retimer_sel and disable_sel and wait for training, and verify all chips show up"
-    )
-
-    topo_backend_octo.galaxy_reset(mobo_dict_after)
-
-    # wait time to make sure devices enumerate
-    # Detect all devices, including remote
-    print("detecting all local devices after reset...")
-    post_reset_devices_local = detect_chips_with_callback(local_only=True)
-    print("detecting all local and remote devices after reset...")
-    post_reset_devices = detect_chips_with_callback(local_only=False)
-
-    if len(topo_backend_octo.devices_local) != len(post_reset_devices_local):
-        print(
-            CMD_LINE_COLOR.RED,
-            f"NOT ALL LOCAL BOARDS DETECTED!, detected {len(post_reset_devices_local)}, expecting {len(topo_backend_octo.devices_local)}",
-            CMD_LINE_COLOR.ENDC,
-        )
-        sys.exit(1)
-
-    if len(topo_backend_octo.devices_remote) * 32 != (
-        len(post_reset_devices) - len(post_reset_devices_local)
-    ):
-        print(
-            CMD_LINE_COLOR.RED,
-            f"NOT ALL REMOTE BOARDS DETECTED!, detected {len(post_reset_devices)-len(post_reset_devices_local)}, expecting {len(topo_backend_octo.devices_remote)*32}",
-            CMD_LINE_COLOR.ENDC,
-        )
-        sys.exit(1)
-
-    print(
-        CMD_LINE_COLOR.GREEN,
-        "All devices detected after reset",
-        CMD_LINE_COLOR.ENDC,
-    )
-
-    print()
 
 
 def main():
@@ -460,12 +370,24 @@ def main():
     local_only = not args.list
 
     try:
-        if args.list or args.octopus:
+        if args.list:
             # We need eth of these options to have full noc access
-            devices = detect_chips_with_callback(local_only=local_only, ignore_ethernet=False)
+            if args.use_luwen:
+                devices = dict(enumerate(detect_chips_with_callback(local_only=local_only, ignore_ethernet=False)))
+            else:
+                opts = TopologyDiscoveryOptions()
+                opts.wait_on_ethernet_link_training = True
+                opts.discover_remote_devices = True
+                umd_cluster_descriptor, devices = TopologyDiscovery.discover(opts)
         else:
             # Only ignore eth for pcie chip flash
-            devices = detect_chips_with_callback(local_only=local_only, ignore_ethernet=True)
+            if args.use_luwen:
+                devices = dict(enumerate(detect_chips_with_callback(local_only=local_only, ignore_ethernet=True)))
+            else:
+                opts = TopologyDiscoveryOptions()
+                opts.wait_on_ethernet_link_training = False
+                opts.discover_remote_devices = False
+                umd_cluster_descriptor, devices = TopologyDiscovery.discover(opts)
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,
@@ -482,22 +404,22 @@ def main():
         sys.exit(1)
 
     # Warn the user if any board is not in the accepted boards list
-    supported_devices = []
-    unsupported_device_names = []
-    for dev in devices:
-        board_type = get_board_type(str(hex(dev.board_id())).replace("0x", ""))
-        supported_boards = ["n300", "n150", "GALAXY"]
+    supported_devices = {}
+    unsupported_device_names = {}
+    for chip_id, device in devices.items():
+        board_type = get_board_type(str(hex(device.board_id())).replace("0x", ""))
+        supported_boards = ["n300", "n150"]
         if board_type in supported_boards:
-            supported_devices.append(dev)
+            supported_devices[chip_id] = device
         else:
-            unsupported_device_names.append(board_type)
+            unsupported_device_names[chip_id] = board_type
 
     # Notify the user; empty lists are falsy
     if unsupported_device_names:
         print(
             ORANGE,
-            f"TT-Topology will only run on n300/n150/GALAXY(WH 4U only) boards.\n",
-            f"Ignoring these devices: {', '.join(unsupported_device_names)}.",
+            f"TT-Topology will only run on n300/n150 boards.\n",
+            f"Ignoring these devices: {', '.join(map(str, unsupported_device_names.values()))}.",
             CMD_LINE_COLOR.ENDC,
         )
         if not supported_devices:
@@ -509,14 +431,16 @@ def main():
             sys.exit(1)
     # Proceed with only supported devices
     devices = supported_devices
+    if not args.use_luwen:
+        umd_cluster_descriptor = ClusterDescriptor.create_constrained_cluster_descriptor(umd_cluster_descriptor, set(devices.keys()))
 
     # List devices and config and exit
     if args.list:
-        detect_current_topology(devices)
+        detect_current_topology(devices, umd_cluster_descriptor if not args.use_luwen else None)
         sys.exit()
 
     if args.generate_reset_json:
-        file = generate_reset_logs(devices)
+        file = generate_reset_logs(list(devices.values()))
         print(
             CMD_LINE_COLOR.PURPLE,
             f"Generated sample reset config file for this host: {file}",
@@ -529,35 +453,10 @@ def main():
         )
         sys.exit(0)
 
-    if args.octopus:
-        if args.reset is not None:
-            reset_input = parse_reset_input(args.reset)
-            if reset_input.type is not ResetType.CONFIG_JSON:
-                e = "Invalid reset input: Please provide only a valid Reset JSON file"
-                print(
-                    CMD_LINE_COLOR.RED,
-                    e,
-                    CMD_LINE_COLOR.ENDC,
-                )
-                sys.exit(1)
-        else:
-            e = "Please provide a reset json file for octopus"
-            print(
-                CMD_LINE_COLOR.RED,
-                e,
-                CMD_LINE_COLOR.ENDC,
-            )
-            sys.exit(1)
-
-        topo_backend_octo = TopoBackend_Octopus(devices, reset_input.value)
-        program_galaxy(topo_backend_octo)
-        sys.exit()
-
-    else:
-        topo_backend = TopoBackend(devices, args.layout, args.plot)
-        errors = False
+    topo_backend = TopoBackend(devices, args.layout, args.plot)
+    errors = False
     try:
-        run_and_flash(topo_backend)
+        run_and_flash(topo_backend, args.use_luwen)
     except Exception as e:
         print(
             CMD_LINE_COLOR.RED,

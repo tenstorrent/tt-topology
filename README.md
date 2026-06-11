@@ -94,7 +94,6 @@ options:
   -v, --version         show program's version number and exit
   -l {linear,torus,mesh,isolated}, --layout {linear,torus,mesh,isolated}
                         Select the layout (linear, torus, mesh, isolated). Default is linear.
-  -o, --octopus
   -f [filename], --filename [filename]
                         Change filename for test log. Default: ~/tt_smi/<timestamp>_snapshot.json
   -g, --generate_reset_json
@@ -180,11 +179,6 @@ For a host with two n300 cards and four n300 cards, the command will generate la
   <img src="images/torus_layout.png?raw=true" alt="torus_layout_2x8" width="47%"/>
 </p>
 
-# Octopus (TGG/TG) Support in TT-Topology
-
-- TGG setting: 8 n150 cards connected to 2 Galaxy 4U systems
-- TG setting: 8 n150 cards connected to 1 Galaxy 4U system
-
 ## Usage
 1. Generate a default mobo reset json file saved at ```~/.config/tenstorrent/reset_config.json``` by running the following command
 
@@ -240,21 +234,8 @@ For a host with two n300 cards and four n300 cards, the command will generate la
 3. Flashing multiple NB cards to use specific eth routing configurations by running the following command
 
     ```
-    $ tt-topology -o -r ~/.config/tenstorrent/reset_config.json
+    $ tt-topology -r ~/.config/tenstorrent/reset_config.json
     ```
-
-## Internal Procedure
-1. Setup `mobo_eth_en` on every local n150 to train with the Galaxy
-2. Program the shelf/rack of the Galaxies
-3. Program all local n150s to rack 0, shelf 0, x 0, y 0
-4. Reset with the following `retimer_sel` and `disable_sel` and wait for training
-    - `retimer_sel`: From the `credo` field of the reset json file for the specific Galaxy
-    - `disable_sel`: All the other ports not specified by the `retimer_sel`
-5. Check QSFP link and change shelf number for each n150 according to the shelf on the connected Galaxy
-6. Program the x, y coords of the local n150s based on the other side of the link
-7. Reset again with the `retimer_sel` and `disable_sel` and wait for training, and verify all chips show up
-    - `retimer_sel`: From the `credo` field of the reset json file for the specific Galaxy
-    - `disable_sel`: From the `disabled_ports` field of the reset json file for the specific Galaxy
 
 # Logging
 
