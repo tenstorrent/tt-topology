@@ -22,7 +22,7 @@ classifiers = [
 ]
 dependencies = [
   'tt_tools_common~=1.6.0',
-  'pyluwen~=0.8.0',
+  'pyluwen~=0.8.5',
   'elasticsearch>=8.11.0',
   'pydantic>=1.2',
   'networkx>=3.1',
