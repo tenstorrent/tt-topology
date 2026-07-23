@@ -1,3 +1,13 @@
+tt-topology (1.2.20) noble; urgency=medium
+
+  [ Samridhi Bansal ]
+  * Chore: bump pyluwen 0.8.0 -> 0.8.5
+
+  [ Tenstorrent Releases ]
+  * pyproject.toml- updating version to 1.2.20
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Thu, 23 Jul 2026 15:31:52 +0000
+
 tt-topology (1.2.19) noble; urgency=medium
 
   [ Joel Smith ]
