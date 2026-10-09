@@ -619,8 +619,8 @@ class TopoBackend:
                         f"Could not assign compliant coordinates to node {v} from node {u} with candidate {candidate_coord}",
                         "Not a true mesh, exiting to avoid flashing wrong coords....",
                         CMD_LINE_COLOR.ENDC,
-                        sys.exit(1)
                     )
+                    sys.exit(1)
         self.log.coordinate_map = coordinates
         return coordinates
 
