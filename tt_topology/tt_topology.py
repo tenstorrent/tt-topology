@@ -486,7 +486,7 @@ def main():
     unsupported_device_names = []
     for dev in devices:
         board_type = get_board_type(str(hex(dev.board_id())).replace("0x", ""))
-        supported_boards = ["n300", "n150", "GALAXY"]
+        supported_boards = ["n300", "n150", "wh_4u", "tt-galaxy-wh"]
         if board_type in supported_boards:
             supported_devices.append(dev)
         else:
