@@ -25,6 +25,31 @@ LOG_FOLDER = os.path.expanduser("~/tt_topology_logs/")
 ORANGE = "\033[38;5;208m"
 
 
+UPI_TO_BOARD_TYPE = {
+    # Grayskull cards
+    0x3: "e150",
+    0xA: "e300",
+    0x7: "e75",
+    # Wormhole cards
+    0x8: "nb_cb",
+    0xB: "wh_4u",
+    0x14: "n300",
+    0x18: "n150",
+    0x35: "tt-galaxy-wh",
+    # Blackhole cards
+    0x36: "bh-scrappy",
+    0x43: "p100a",
+    0x40: "p150a",
+    0x41: "p150b",
+    0x42: "p150c",
+    0x44: "p300b",
+    0x45: "p300a",
+    0x46: "p300c",
+    0x47: "tt-galaxy-bh",
+    0x202: "tt-galaxy-bh",
+}
+
+
 def get_board_type(board_id: str) -> str:
     """
     Get board type from board ID string.
@@ -39,28 +64,13 @@ def get_board_type(board_id: str) -> str:
                    |     +--------------- BBBBB = Unique Part Identifier (UPI)
                    +--------------------- AA
     """
-    UPI_TO_BOARD_TYPE = {
-        # Wormhole cards
-        0x8: "nb_cb",
-        0xB: "wh_4u",
-        0x14: "n300",
-        0x18: "n150",
-        0x35: "tt-galaxy-wh",
-        # Blackhole cards
-        0x36: "bh-scrappy",
-        0x43: "p100a",
-        0x40: "p150a",
-        0x41: "p150b",
-        0x42: "p150c",
-        0x44: "p300b",
-        0x45: "p300a",
-        0x46: "p300c",
-        0x47: "tt-galaxy-bh",
-    }
-    try:
-        serial_num = int(f"0x{board_id}", base=16)
-    except ValueError:
+    if (
+        not isinstance(board_id, str)
+        or not (1 <= len(board_id) <= 16)
+        or not all(c in "0123456789abcdefABCDEF" for c in board_id)
+    ):
         return "N/A"
+    serial_num = int(board_id, 16)
     upi = (serial_num >> 36) & 0xFFFFF
 
     return UPI_TO_BOARD_TYPE.get(upi, "N/A")
