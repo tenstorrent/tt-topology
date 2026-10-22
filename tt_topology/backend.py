@@ -185,6 +185,8 @@ class TopoBackend:
         config_state = []
         config_state_log = []
         for device in self.devices:
+            if device.is_remote():
+                continue
             dev_config_log = log.ChipConfig()
             wh_chip = device.as_wh()
             fw_version = bytearray(4)

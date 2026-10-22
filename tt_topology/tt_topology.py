@@ -6,6 +6,7 @@ Tenstorrent Topology (TT-Topology) is a command line utility
 to flash ethernet coordinates when multiple NB's are connected together.
 """
 
+import gc
 import sys
 import time
 import argparse
@@ -158,6 +159,9 @@ def run_and_flash(topo_backend: TopoBackend):
         f"Initiating reset on chips at pcie interface: {pci_interfaces}",
         CMD_LINE_COLOR.ENDC,
     )
+    # Release open device handles before PCI reset so stale BAR mappings/fds are not held across reset
+    topo_backend.devices = []
+    gc.collect()
     reset_devices = reset_obj.full_lds_reset(pci_interfaces)
     print(
         CMD_LINE_COLOR.BLUE,
@@ -270,6 +274,9 @@ def run_and_flash(topo_backend: TopoBackend):
         f"Initiating reset on chips at pcie interface: {pci_interfaces}",
         CMD_LINE_COLOR.ENDC,
     )
+    topo_backend.devices = []
+    connection_data = {}
+    gc.collect()
     reset_devices = reset_obj.full_lds_reset(pci_interfaces)
     topo_backend.devices = detect_chips_with_callback()
     print(
@@ -301,6 +308,8 @@ def run_and_flash(topo_backend: TopoBackend):
         f"Initiating reset on chips at pcie interface: {pci_interfaces}",
         CMD_LINE_COLOR.ENDC,
     )
+    topo_backend.devices = []
+    gc.collect()
     reset_devices = reset_obj.full_lds_reset(pci_interfaces)
     topo_backend.devices = detect_chips_with_callback()
     print(
