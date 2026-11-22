@@ -34,6 +34,7 @@ jobs:
       contents: write
     outputs:
       temp_branch_ref: ${{ steps.temp_branch_ref.outputs.temp_branch_ref }}
+      temp_branch_sha: ${{ steps.temp_branch_sha.outputs.temp_branch_sha }}
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
@@ -46,6 +47,10 @@ jobs:
           export temp_branch_ref="temp_branch_ref=rc-temp-$( git rev-parse --short HEAD )-$( date +%Y.%m.%d-%H.%M.%S )"
           echo "${temp_branch_ref}"
           echo "${temp_branch_ref}" >> "$GITHUB_OUTPUT"
+      # The commit the release branch starts from; the Debian build checks it.
+      - name: Record the commit of the branch
+        id: temp_branch_sha
+        run: echo "temp_branch_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Create the branch
         run: git checkout -b "${{ steps.temp_branch_ref.outputs.temp_branch_ref }}"
       - name: Push the branch to work from
@@ -231,6 +236,12 @@ jobs:
       - create-temp-branch
       - versionchange
       - changelogs
+    # build-all.yml calls build-debian.yml, whose job build-deb signs in to
+    # the OSPO Vault for the Debian signing key; a called workflow gets at
+    # most these (OSPO-825).
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/build-all.yml
     with:
       ref: ${{ needs.create-temp-branch.outputs.temp_branch_ref }}
@@ -238,6 +249,10 @@ jobs:
       MINOR: ${{ needs.versionchange.outputs.version_minor }}
       PATCH: ${{ needs.versionchange.outputs.version_patch }}
       NUMBER_OF_COMMITS_SINCE_TAG: ${{ needs.versionchange.outputs.number_of_commits_since_tag }}
+      # Build the exact commit that job changelogs made, not the branch name.
+      sha: ${{ needs.changelogs.outputs.git_hash }}
+      base_sha: ${{ needs.create-temp-branch.outputs.temp_branch_sha }}
+      version_sha: ${{ needs.versionchange.outputs.git_hash }}
     secrets: inherit
 
   # Tag the Release

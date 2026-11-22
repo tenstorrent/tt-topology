@@ -20,11 +20,22 @@ on:
       NUMBER_OF_COMMITS_SINCE_TAG:
         required: false
         type: string
+      sha:
+        required: false
+        type: string
+      base_sha:
+        required: false
+        type: string
+      version_sha:
+        required: false
+        type: string
 
 jobs:
   build_all_depends:
     name: Build All the packages!
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - run: echo "Ok, so here we go for building *ALL* the packages.  I said *ALL* of them now!"
       - run: |
@@ -35,6 +46,11 @@ jobs:
     needs:
       - build_all_depends
     name: Build Ubuntu / Debian
+    # build-debian.yml job build-deb signs in to the OSPO Vault for the
+    # Debian signing key; a called workflow gets at most these (OSPO-825).
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/build-debian.yml
     with:
       ref: ${{ inputs.ref }}
@@ -42,10 +58,15 @@ jobs:
       MINOR:  ${{ inputs.MINOR }}
       PATCH:  ${{ inputs.PATCH }}
       NUMBER_OF_COMMITS_SINCE_TAG:  ${{ inputs.NUMBER_OF_COMMITS_SINCE_TAG }}
+      sha: ${{ inputs.sha }}
+      base_sha: ${{ inputs.base_sha }}
+      version_sha: ${{ inputs.version_sha }}
     secrets: inherit
   buildpypi:
     needs:
       - build_all_depends
+    permissions:
+      contents: read
     uses: ./.github/workflows/build-pypi.yml
     with:
       ref: ${{ inputs.ref }}
